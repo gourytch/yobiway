@@ -3,7 +3,7 @@ package main
 import (
 	"compress/gzip"
 	"encoding/json"
-	"fmt"
+	//"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -47,7 +47,7 @@ func initdb() error {
 				return err
 			}
 		} else {
-			log.Printf("bucket %s exists", bucketCACHE)
+			//log.Printf("bucket %s exists", bucketCACHE)
 		}
 		return err
 	})
@@ -69,9 +69,9 @@ func cache_get(url []byte) (body []byte) {
 	db.View(func(tx *bolt.Tx) error {
 		body = []byte(tx.Bucket(bucketCACHE).Get(url))
 		if body == nil {
-			log.Printf("+ %s not in cache", url)
+			//log.Printf("+ %s not in cache", url)
 		} else {
-			log.Printf("+ %s get cached %d bytes", url, len(body))
+			//log.Printf("+ %s get cached %d bytes", url, len(body))
 		}
 		return nil
 	})
@@ -79,14 +79,14 @@ func cache_get(url []byte) (body []byte) {
 }
 
 func cache_put(url, body []byte) {
-	log.Printf("+ %s <- %d bytes", url, len(body))
+	//log.Printf("+ %s <- %d bytes", url, len(body))
 	db.Update(func(tx *bolt.Tx) error {
-		log.Printf("... + %s <- %d bytes", url, len(body))
+		//log.Printf("... + %s <- %d bytes", url, len(body))
 		err := tx.Bucket(bucketCACHE).Put(url, body)
 		if err != nil {
 			log.Printf("! not cached %s due error: %s", url, err)
 		} else {
-			log.Printf("+ %s cached", url)
+			//log.Printf("+ %s cached", url)
 		}
 		return err
 	})
@@ -96,14 +96,14 @@ func (s *Session) Get(url string) (body []byte, err error) {
 	burl := []byte(url)
 
 	if body = cache_get(burl); body != nil {
-		log.Printf("... use cached: %s (%d bytes)", url, len(body))
+		//log.Printf("... use cached: %s (%d bytes)", url, len(body))
 		return
 	}
-	log.Printf("... cache miss. request: %s", url)
+	//log.Printf("... cache miss. request: %s", url)
 
 	dt := time.Now().Sub(s.LastRq)
 	if dt < REQ_INTERVAL {
-		log.Printf("... wait for a little ...")
+		//log.Printf("... wait for a little ...")
 		time.Sleep(REQ_INTERVAL - dt)
 	}
 	s.LastRq = time.Now()
@@ -128,7 +128,7 @@ func (s *Session) Get(url string) (body []byte, err error) {
 		reader = response.Body
 	}
 	body, err = ioutil.ReadAll(reader)
-	fmt.Printf("... got: %d bytes\n", len(body))
+	//fmt.Printf("... got: %d bytes\n", len(body))
 	if err != nil {
 		return
 	}
@@ -169,7 +169,7 @@ func (s *Session) GetTickers(pairs []string) (v []Ticker, err error) {
 		if L < r {
 			r = L
 		}
-		log.Printf("process slice [%d:%d]", offs, r)
+		//log.Printf("process slice [%d:%d]", offs, r)
 		P := sorted_pairs[offs:r]
 		Ps := strings.Join(P, "-")
 		var data []byte

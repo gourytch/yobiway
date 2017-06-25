@@ -16,6 +16,7 @@ var YOBI_FEE_K float64 = (1.0 - YOBI_FEE/100.0)
 var MAX_DISPERSION float64 = 0.2
 var MIN_PRICE float64 = 0.000001 // 0.0000001
 var MIN_VOLUME float64 = 0.00001
+var BEST_LIMIT int = 3
 
 type NodeNames map[loophole.Node]string
 type NameNodes map[string]loophole.Node
@@ -220,11 +221,11 @@ func (a BestPaths) Len() int           { return len(a) }
 func (a BestPaths) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a BestPaths) Less(i, j int) bool { return a[i].weight < a[j].weight }
 
-func (p *BestPaths) add(myp MyPath, limit int) {
+func (p *BestPaths) add(myp MyPath) {
 	*p = append(*p, myp)
 	sort.Sort(sort.Reverse(*p))
-	if limit < len(*p) {
-		*p = (*p)[:limit]
+	if BEST_LIMIT < len(*p) {
+		*p = (*p)[:BEST_LIMIT+1]
 	}
 }
 
@@ -237,8 +238,22 @@ func (p *BestPaths) show() {
 var best BestPaths
 
 func path_processor(path *loophole.Path) bool {
-	(&best).add(makeMyPath(path), 10)
+	(&best).add(makeMyPath(path))
 	return false
+}
+
+func Loop(token string, model int) {
+	fmt.Printf(" === LOOP FOR %s ===", token)
+	node := namenodes[token]
+	best = BestPaths(nil)
+	(&graph).Walk(node, node, path_processor)
+	(&best).show()
+	if len(best) > 0 {
+		//decode(best[0], GREEDY_MODEL)
+		//decode(best[0], AVERAGE_MODEL)
+		//decode(best[0], SPEEDY_MODEL)
+		decode(best[0], model)
+	}
 }
 
 /// MAIN ///
@@ -266,19 +281,10 @@ func main() {
 		log.Printf("%d tickers\n", len(all_tickers))
 	}
 
-	//generate(t, GREEDY_MODEL)
-	generate(AVERAGE_MODEL)
+	model := AVERAGE_MODEL
+	generate(model)
 	log.Printf("%d edges", len(graph))
-
-	tok_start := "btc"
-	tok_finish := "btc"
-	node_start := namenodes[tok_start]
-	node_finish := namenodes[tok_finish]
-	(&graph).Walk(node_start, node_finish, path_processor)
-	(&best).show()
-	if len(best) > 0 {
-		decode(best[0], GREEDY_MODEL)
-		decode(best[0], AVERAGE_MODEL)
-		decode(best[0], SPEEDY_MODEL)
-	}
+	Loop("rur", model)
+	Loop("usd", model)
+	Loop("btc", model)
 }
