@@ -13,6 +13,9 @@ import (
 
 var YOBI_FEE float64 = 0.2
 var YOBI_FEE_K float64 = (1.0 - YOBI_FEE/100.0)
+var BITTREX_FEE float64 = 0.25
+var BITTREX_FEE_K float64 = (1.0 - BITTREX_FEE/100.0)
+
 var MAX_DISPERSION float64 = 0.2
 var MIN_PRICE float64 = 0.000001 // 0.0000001
 var MIN_VOLUME float64 = 0.00001
@@ -21,11 +24,15 @@ var BEST_LIMIT int = 3
 type NodeNames map[loophole.Node]string
 type NameNodes map[string]loophole.Node
 
+var session *Session
+
 var nodenames NodeNames = NodeNames{}
 var namenodes NameNodes = NameNodes{}
 var graph loophole.Graph = loophole.Graph{}
+var cur_fee float64
+var cur_fee_k float64
 
-var all_pairs []string
+//var all_pairs []string
 var all_tickers []Ticker
 
 const (
@@ -96,21 +103,20 @@ func generate(model int) {
 		}
 		switch model {
 		case GREEDY_MODEL: // покупаем по цене закупа, продаём по продажной
-			weight_forw = loophole.Weight(ticker.Sell * YOBI_FEE_K)
-			weight_back = loophole.Weight((1.0 / ticker.Buy) * YOBI_FEE_K)
+			weight_forw = loophole.Weight(ticker.Sell * cur_fee_k)
+			weight_back = loophole.Weight((1.0 / ticker.Buy) * cur_fee_k)
 		case AVERAGE_MODEL: // покупаем и продаём по средней цене
-			weight_forw = loophole.Weight(avg_price * YOBI_FEE_K)
-			weight_back = loophole.Weight((1.0 / avg_price) * YOBI_FEE_K)
+			weight_forw = loophole.Weight(avg_price * cur_fee_k)
+			weight_back = loophole.Weight((1.0 / avg_price) * cur_fee_k)
 		case SPEEDY_MODEL: // покупаем что продадут и продаём что купят
-			weight_forw = loophole.Weight(ticker.Buy * YOBI_FEE_K)
-			weight_back = loophole.Weight((1.0 / ticker.Sell) * YOBI_FEE_K)
+			weight_forw = loophole.Weight(ticker.Buy * cur_fee_k)
+			weight_back = loophole.Weight((1.0 / ticker.Sell) * cur_fee_k)
 		}
-		// verify:
-		loopcost := weight_forw * weight_back
-		if loopcost > 1.0 {
-			//log.Printf("skip ticker %s due OVERLOOP: %.8f * %.8f = %.8f", pairname, weight_forw, weight_back, loopcost)
-			continue
-		}
+		//loopcost := weight_forw * weight_back
+		//if loopcost > 1.0 {
+		//	log.Printf("skip ticker %s due OVERLOOP: %.8f * %.8f = %.8f", pairname, weight_forw, weight_back, loopcost)
+		//	continue
+		//}
 		forw := loophole.Edge{
 			From:   node_from,
 			To:     node_to,
@@ -194,8 +200,9 @@ func decode(mp MyPath, model int) {
 			case SPEEDY_MODEL:
 				price = T.Buy
 			}
-			result = amount * price * YOBI_FEE_K
-			action = fmt.Sprintf("[%s->%s] SELL %.8f %s, GET %.8f %s", from, to, amount, from, result, to)
+			result = amount * price * cur_fee_k
+			action = fmt.Sprintf("[%s->%s] sell %s, amount=%.8f[%s] * price=%.8f - %.2f%% = %.8f %s",
+				from, to, from, amount, from, price, cur_fee, result, to)
 		} else { // покупаем to за from
 			switch model {
 			case GREEDY_MODEL:
@@ -205,8 +212,9 @@ func decode(mp MyPath, model int) {
 			case SPEEDY_MODEL:
 				price = T.Sell
 			}
-			result = amount * (1.0 / price) * YOBI_FEE_K
-			action = fmt.Sprintf("[%s<-%s] BUY FOR %.8f %s, GET %.8f %s", to, from, amount, from, result, to)
+			result = amount / price * cur_fee_k
+			action = fmt.Sprintf("[%s<-%s] buy %s, amount=%.8f[%s] / price=%.8f - %.2f%% = %.8f %s",
+				to, from, to, amount, from, price, cur_fee, result, to)
 		}
 		fmt.Printf("  %s\n", action)
 		from = to
@@ -225,7 +233,7 @@ func (p *BestPaths) add(myp MyPath) {
 	*p = append(*p, myp)
 	sort.Sort(sort.Reverse(*p))
 	if BEST_LIMIT < len(*p) {
-		*p = (*p)[:BEST_LIMIT+1]
+		*p = (*p)[:BEST_LIMIT]
 	}
 }
 
@@ -243,7 +251,7 @@ func path_processor(path *loophole.Path) bool {
 }
 
 func Loop(token string, model int) {
-	fmt.Printf(" === LOOP FOR %s ===", token)
+	fmt.Printf(" === LOOP FOR %s ===\n", token)
 	node := namenodes[token]
 	best = BestPaths(nil)
 	(&graph).Walk(node, node, path_processor)
@@ -254,6 +262,60 @@ func Loop(token string, model int) {
 		//decode(best[0], SPEEDY_MODEL)
 		decode(best[0], model)
 	}
+	fmt.Println("")
+}
+
+func load_yobiway() {
+	pairs, err := session.GetPairs()
+	if err != nil {
+		log.Printf("ERROR: %s\n", err)
+		return
+	} else {
+		log.Printf("%d pairs\n", len(pairs))
+	}
+	sort.Sort(Alphabetically(pairs))
+
+	all_tickers, err = session.GetTickers(pairs)
+	if err != nil {
+		log.Printf("ERROR: %s", err)
+	} else {
+		log.Printf("%d tickers\n", len(all_tickers))
+	}
+}
+
+func load_bittrex() {
+	var err error
+	all_tickers, err = session.GetBittrexTickers()
+	if err != nil {
+		log.Printf("ERROR: %s", err)
+	} else {
+		log.Printf("%d tickers\n", len(all_tickers))
+	}
+}
+
+func play_yobit() {
+	load_yobiway()
+	cur_fee = YOBI_FEE
+	cur_fee_k = YOBI_FEE_K
+	var model int
+	fmt.Printf("\n### GENERATE AVERAGE MODEL\n\n")
+	model = AVERAGE_MODEL
+	generate(model)
+	log.Printf("%d edges", len(graph))
+	Loop("rur", model)
+	Loop("usd", model)
+	Loop("btc", model)
+}
+
+func play_bittrex() {
+	load_bittrex()
+	cur_fee = BITTREX_FEE
+	cur_fee_k = BITTREX_FEE_K
+	model := AVERAGE_MODEL
+	fmt.Printf("\n### GENERATE MODEL #%d\n\n", model)
+	generate(model)
+	log.Printf("%d edges", len(graph))
+	Loop("BTC", model)
 }
 
 /// MAIN ///
@@ -264,27 +326,7 @@ func main() {
 		log.Fatalf("database not initialized: %s", err)
 	}
 	defer closedb()
-	s := NewSession()
-	all_pairs, err = s.GetPairs()
-	if err != nil {
-		log.Printf("ERROR: %s\n", err)
-		return
-	} else {
-		log.Printf("%d pairs\n", len(all_pairs))
-	}
-	sort.Sort(Alphabetically(all_pairs))
-
-	all_tickers, err = s.GetTickers(all_pairs)
-	if err != nil {
-		log.Printf("ERROR: %s", err)
-	} else {
-		log.Printf("%d tickers\n", len(all_tickers))
-	}
-
-	model := AVERAGE_MODEL
-	generate(model)
-	log.Printf("%d edges", len(graph))
-	Loop("rur", model)
-	Loop("usd", model)
-	Loop("btc", model)
+	session = NewSession()
+	play_bittrex()
+	//play_yobit()
 }
