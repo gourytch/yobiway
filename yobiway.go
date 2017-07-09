@@ -293,6 +293,26 @@ func load_bittrex() {
 	}
 }
 
+func load_ccex() {
+	var err error
+	all_tickers, err = session.GetCCexTickers()
+	if err != nil {
+		log.Printf("ERROR: %s", err)
+	} else {
+		log.Printf("%d tickers\n", len(all_tickers))
+	}
+}
+
+func load_livecoin() {
+	var err error
+	all_tickers, err = session.GetLivecoinTickers()
+	if err != nil {
+		log.Printf("ERROR: %s", err)
+	} else {
+		log.Printf("%d tickers\n", len(all_tickers))
+	}
+}
+
 func play_yobit() {
 	load_yobiway()
 	cur_fee = YOBI_FEE
@@ -318,6 +338,28 @@ func play_bittrex() {
 	Loop("BTC", model)
 }
 
+func play_ccex() {
+	load_ccex()
+	cur_fee = BITTREX_FEE
+	cur_fee_k = BITTREX_FEE_K
+	model := AVERAGE_MODEL
+	fmt.Printf("\n### GENERATE MODEL #%d\n\n", model)
+	generate(model)
+	log.Printf("%d edges", len(graph))
+	Loop("BTC", model)
+}
+
+func play_livecoin() {
+	load_livecoin()
+	cur_fee = BITTREX_FEE
+	cur_fee_k = BITTREX_FEE_K
+	model := AVERAGE_MODEL
+	fmt.Printf("\n### GENERATE MODEL #%d\n\n", model)
+	generate(model)
+	log.Printf("%d edges", len(graph))
+	Loop("BTC", model)
+}
+
 /// MAIN ///
 
 func main() {
@@ -327,6 +369,8 @@ func main() {
 	}
 	defer closedb()
 	session = NewSession()
-	play_bittrex()
 	//play_yobit()
+	//play_bittrex()
+	//play_ccex()
+	play_livecoin()
 }
