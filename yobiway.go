@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gourytch/loophole"
+	"flag"
 )
 
 
@@ -352,7 +353,7 @@ func load_livecoin() {
 	}
 }
 
-func play_yobit() {
+func play_yobit(token string) {
 	load_yobiway()
 	cur_fee = YOBI_FEE
 	cur_fee_k = YOBI_FEE_K
@@ -361,12 +362,10 @@ func play_yobit() {
 	model = AVERAGE_MODEL
 	generate(model)
 	log.Printf("%d edges", len(graph))
-	Loop("rur")
-	Loop("usd")
-	Loop("btc")
+	Loop(token)
 }
 
-func play_bittrex() {
+func play_bittrex(token string) {
 	load_bittrex()
 	cur_fee = BITTREX_FEE
 	cur_fee_k = BITTREX_FEE_K
@@ -374,10 +373,10 @@ func play_bittrex() {
 	fmt.Printf("\n### GENERATE MODEL #%d\n\n", model)
 	generate(model)
 	log.Printf("%d edges", len(graph))
-	Loop("BTC")
+	Loop(token)
 }
 
-func play_ccex() {
+func play_ccex(token string) {
 	load_ccex()
 	cur_fee = BITTREX_FEE
 	cur_fee_k = BITTREX_FEE_K
@@ -385,10 +384,10 @@ func play_ccex() {
 	fmt.Printf("\n### GENERATE MODEL #%d\n\n", model)
 	generate(model)
 	log.Printf("%d edges", len(graph))
-	Loop("BTC")
+	Loop(token)
 }
 
-func play_livecoin() {
+func play_livecoin(token string) {
 	load_livecoin()
 	cur_fee = BITTREX_FEE
 	cur_fee_k = BITTREX_FEE_K
@@ -396,32 +395,37 @@ func play_livecoin() {
 	fmt.Printf("\n### GENERATE MODEL #%d\n\n", model)
 	generate(model)
 	log.Printf("%d edges", len(graph))
-	//Loop("BTC", model)
-	Loop("USD")
+	Loop(token)
 }
 
 /// MAIN ///
-
-const PLAY_WITH = "livecoin"
-const CACHED  = false
+var CACHED = true
 
 func main() {
+	var exchange string
+	var token string
+	flag.StringVar(&exchange, "exchange", "livecoin", "exchange to analyze")
+	flag.StringVar(&token,"token", "BTC", "token to cycle")
+	flag.BoolVar(&CACHED, "cached", true, "load from cache")
+	flag.Parse()
+	log.Printf("exchange=%v, token=%v, cached=%v", exchange, token, CACHED)
+
 	var err error = boltdb_init()
 	if err != nil {
 		log.Fatalf("database not initialized: %s", err)
 	}
 	defer boltdb_close()
 	session = NewSession()
-	switch PLAY_WITH {
+	switch exchange {
 	case "yobit":
-		play_yobit()
+		play_yobit(token)
 	case "bittrex":
-		play_bittrex()
+		play_bittrex(token)
 	case "ccex":
-		play_ccex()
+		play_ccex(token)
 	case "livecoin":
-		play_livecoin()
+		play_livecoin(token)
 	default:
-		log.Fatal("UNKNOWN:", PLAY_WITH)
+		log.Fatal("UNKNOWN:", token)
 	}
 }
