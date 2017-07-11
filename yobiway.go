@@ -426,6 +426,6 @@ func main() {
 	case "livecoin":
 		play_livecoin(token)
 	default:
-		log.Fatal("UNKNOWN:", token)
+		log.Fatal("UNKNOWN:", exchange)
 	}
 }
