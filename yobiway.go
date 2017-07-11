@@ -134,6 +134,11 @@ func generate(model int) {
 		//log.Printf("add ticker %s to graph", pairname)
 		graph = append(graph, forw, back)
 	}
+	tokens := []string{}
+	for token := range namenodes {
+		tokens = append(tokens, token)
+	}
+	log.Printf("graph tokens: %v", tokens)
 }
 
 func find_weight(from, to string) float64 {
@@ -408,6 +413,8 @@ func main() {
 	flag.StringVar(&token,"token", "BTC", "token to cycle")
 	flag.BoolVar(&CACHED, "cached", true, "load from cache")
 	flag.Parse()
+	exchange = strings.ToUpper(exchange)
+	token = strings.ToUpper(token)
 	log.Printf("exchange=%v, token=%v, cached=%v", exchange, token, CACHED)
 
 	var err error = boltdb_init()
@@ -417,15 +424,15 @@ func main() {
 	defer boltdb_close()
 	session = NewSession()
 	switch exchange {
-	case "yobit":
+	case "YOBIT":
 		play_yobit(token)
-	case "bittrex":
+	case "BITTREX":
 		play_bittrex(token)
-	case "ccex":
+	case "CCEX":
 		play_ccex(token)
-	case "livecoin":
+	case "LIVECOIN":
 		play_livecoin(token)
 	default:
-		log.Fatal("UNKNOWN:", exchange)
+		log.Fatal("UNKNOWN EXCHANGE:", exchange)
 	}
 }

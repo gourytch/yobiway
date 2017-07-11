@@ -60,8 +60,8 @@ func (s *Session) GetTickers(pairs []string) (v []Ticker, err error) {
 			if err != nil {
 				return
 			}
-			jv.TokenName = token
-			jv.CurrencyName = currency
+			jv.TokenName = strings.ToUpper(token)
+			jv.CurrencyName = strings.ToUpper(currency)
 			v = append(v, jv)
 		}
 		offs = r
