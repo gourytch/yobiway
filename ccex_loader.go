@@ -34,7 +34,7 @@ type JCCexMarketSummaries struct {
 
 func (s *Session) GetCCexTickers() (v []Ticker, err error) {
 	var data []byte
-	data, err = s.Get("https://c-cex.com/t/api_pub.html?a=getmarketsummaries")
+	data, err = s.Get("https://c-cex.com/t/api_pub.html?a=getmarketsummaries", CACHED)
 	if err != nil {
 		return
 	}

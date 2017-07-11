@@ -14,7 +14,7 @@ func (s *Session) GetTicker(pair string) (t Ticker, err error) {
 	if err != nil {
 		return
 	}
-	data, err := s.Get("https://yobit.net/api/3/" + pair + "/ticker")
+	data, err := s.Get("https://yobit.net/api/3/" + pair + "/ticker", CACHED)
 	if err != nil {
 		return
 	}
@@ -45,7 +45,7 @@ func (s *Session) GetTickers(pairs []string) (v []Ticker, err error) {
 		P := sorted_pairs[offs:r]
 		Ps := strings.Join(P, "-")
 		var data []byte
-		data, err = s.Get("https://yobit.net/api/3/ticker/" + Ps)
+		data, err = s.Get("https://yobit.net/api/3/ticker/" + Ps, CACHED)
 		if err != nil {
 			return
 		}
@@ -70,7 +70,7 @@ func (s *Session) GetTickers(pairs []string) (v []Ticker, err error) {
 }
 
 func (s *Session) GetPairs() (pairs []string, err error) {
-	data, err := s.Get("https://yobit.net/api/3/info")
+	data, err := s.Get("https://yobit.net/api/3/info", CACHED)
 	if err != nil {
 		return
 	}

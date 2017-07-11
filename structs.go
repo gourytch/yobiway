@@ -2,11 +2,21 @@ package main
 
 import (
 	"log"
+	"fmt"
 )
 
+/*
+const (
+	EXC_LIVECOIN = "livecoin"
+	EXC_BITTREX  = "bittrex"
+	EXC_CCEX     = "ccex"
+	EXC_YOBIT    = "yobit"
+)
+*/
+
 type Ticker struct {
-	TokenName     string  `json:-` // имя фантика
-	CurrencyName  string  `json:-` // имя валюты (btc/usd/rur/etc.)
+	TokenName     string  `json:"-"` // имя фантика
+	CurrencyName  string  `json:"-"` // имя валюты (btc/usd/rur/etc.)
 	High          float64 `json:"high"`
 	Low           float64 `json:"low"`
 	Average       float64 `json:"avg"`
@@ -26,8 +36,8 @@ type JTicker struct {
 type JTickers map[string]Ticker
 
 type PairDesc struct {
-	TokenName     string  `json:-` // имя фантика
-	CurrencyName  string  `json:-` // имя валюты (btc/usd/rur/etc.)
+	TokenName     string  `json:"-"` // имя фантика
+	CurrencyName  string  `json:"-"` // имя валюты (btc/usd/rur/etc.)
 	DecimalPlaces int     `json:"decimal_places"`
 	MinPrice      float64 `json:"min_price"`
 	MaxPrice      float64 `json:"max_price"`
@@ -43,12 +53,17 @@ type JPairs struct {
 	Pairs map[string]PairDesc `json:"pairs"`
 }
 
+func (t *Ticker) str() string {
+	return fmt.Sprintf("pair     : %s_%s\n", t.TokenName, t.CurrencyName) +
+		fmt.Sprintf("Lo/Hi    : %f .. %f\n", t.Low, t.High) +
+		fmt.Sprintf("Vol/Cur  : %f / %f\n", t.Volume, t.CurrentVolume) +
+		fmt.Sprintf("Last     : %f\n", t.Last) +
+		fmt.Sprintf("Average  : %f\n", t.Average) +
+		fmt.Sprintf("Buy/Sell : %f / %f\n", t.Buy, t.Sell)
+}
+
 func (t *Ticker) log() {
-	log.Printf("pair     : %s_%s", t.TokenName, t.CurrencyName)
-	log.Printf("Lo/Hi,Avg: %f .. %f, %f", t.Low, t.High, t.Average)
-	log.Printf("Vol/Cur  : %f / %f", t.Volume, t.CurrentVolume)
-	log.Printf("Last     : %f", t.Last)
-	log.Printf("Buy/Sell : %f / %f", t.Buy, t.Sell)
+	log.Print(t.str())
 }
 
 type Alphabetically []string

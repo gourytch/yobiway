@@ -30,7 +30,7 @@ type JLivecoinExchangeTicker struct {
 	Currency string  `json:"cur"`    // "USD"
 	Symbol   string  `json:"symbol"` // "USD/RUR"
 	Last     float64 `json:"last"`
-	High     float64 `json"last"`
+	High     float64 `json:"high"`
 	Low      float64 `json:"low"`
 	Volume   float64 `json:"volume"`
 	VWap     float64 `json:"vwap"` // volume weighted average price
@@ -44,7 +44,7 @@ type JLivecoinExchangeTickers []JLivecoinExchangeTicker
 
 func (s *Session) GetLivecoinTickers() (v []Ticker, err error) {
 	var data []byte
-	data, err = s.Get("https://api.livecoin.net/exchange/ticker")
+	data, err = s.Get("https://api.livecoin.net/exchange/ticker", CACHED)
 	if err != nil {
 		return
 	}

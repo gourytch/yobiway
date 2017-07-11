@@ -11,14 +11,15 @@ import (
 	"github.com/gourytch/loophole"
 )
 
+
 var YOBI_FEE float64 = 0.2
 var YOBI_FEE_K float64 = (1.0 - YOBI_FEE/100.0)
 var BITTREX_FEE float64 = 0.25
 var BITTREX_FEE_K float64 = (1.0 - BITTREX_FEE/100.0)
 
 var MAX_DISPERSION float64 = 0.2
-var MIN_PRICE float64 = 0.000001 // 0.0000001
-var MIN_VOLUME float64 = 0.00001
+var MIN_PRICE float64 = 0.00000100 // 0.0000001
+var MIN_VOLUME float64 = 100       // 0.00001
 var BEST_LIMIT int = 3
 
 type NodeNames map[loophole.Node]string
@@ -36,7 +37,7 @@ var cur_fee_k float64
 var all_tickers []Ticker
 
 const (
-	GREEDY_MODEL = iota
+	GREEDY_MODEL  = iota
 	AVERAGE_MODEL
 	SPEEDY_MODEL
 )
@@ -66,7 +67,7 @@ func generate(model int) {
 		var ok bool
 		var node_from loophole.Node
 		var node_to loophole.Node
-		var weight_forw loophole.Weight
+		var weight_fwd loophole.Weight
 		var weight_back loophole.Weight
 
 		node_from, ok = namenodes[ticker.TokenName]
@@ -90,8 +91,10 @@ func generate(model int) {
 			continue
 		}
 		// check distance
-		avg_price := (ticker.Sell + ticker.Buy) / 2.0
-		dta_price := math.Abs(ticker.Sell - ticker.Buy)
+		spread_min := math.Min(ticker.Buy, ticker.Sell)
+		spread_max := math.Max(ticker.Buy, ticker.Sell)
+		avg_price := ticker.Average
+		dta_price := spread_max - spread_min
 		dsp_price := dta_price * dta_price / avg_price
 		if MAX_DISPERSION < dsp_price {
 			//log.Printf("skip ticker %s by dispersion (avg=%.6f, delta=%.6f, disp=%.6f", pairname, avg_price, dta_price, dsp_price)
@@ -103,24 +106,24 @@ func generate(model int) {
 		}
 		switch model {
 		case GREEDY_MODEL: // покупаем по цене закупа, продаём по продажной
-			weight_forw = loophole.Weight(ticker.Sell * cur_fee_k)
-			weight_back = loophole.Weight((1.0 / ticker.Buy) * cur_fee_k)
+			weight_fwd = loophole.Weight(spread_max * cur_fee_k)
+			weight_back = loophole.Weight((1.0 / spread_min) * cur_fee_k)
 		case AVERAGE_MODEL: // покупаем и продаём по средней цене
-			weight_forw = loophole.Weight(avg_price * cur_fee_k)
+			weight_fwd = loophole.Weight(avg_price * cur_fee_k)
 			weight_back = loophole.Weight((1.0 / avg_price) * cur_fee_k)
 		case SPEEDY_MODEL: // покупаем что продадут и продаём что купят
-			weight_forw = loophole.Weight(ticker.Buy * cur_fee_k)
-			weight_back = loophole.Weight((1.0 / ticker.Sell) * cur_fee_k)
+			weight_fwd = loophole.Weight(spread_min * cur_fee_k)
+			weight_back = loophole.Weight((1.0 / spread_max) * cur_fee_k)
 		}
-		//loopcost := weight_forw * weight_back
+		//loopcost := weight_fwd * weight_back
 		//if loopcost > 1.0 {
-		//	log.Printf("skip ticker %s due OVERLOOP: %.8f * %.8f = %.8f", pairname, weight_forw, weight_back, loopcost)
+		//	log.Printf("skip ticker %s due OVERLOOP: %.8f * %.8f = %.8f", pairname, weight_fwd, weight_back, loopcost)
 		//	continue
 		//}
 		forw := loophole.Edge{
 			From:   node_from,
 			To:     node_to,
-			Weight: weight_forw,
+			Weight: weight_fwd,
 		}
 		back := loophole.Edge{
 			From:   node_to,
@@ -132,8 +135,20 @@ func generate(model int) {
 	}
 }
 
-////
+func find_weight(from, to string) float64 {
+	node_from := namenodes[from]
+	node_to := namenodes[to]
 
+	for _, n := range graph {
+		if n.From == node_from && n.To == node_to {
+			return float64(n.Weight)
+		}
+	}
+	return -1
+}
+
+////
+/*
 func find_direct(from, to string) (v []Ticker) {
 	for _, t := range all_tickers {
 		if from != "" && from != t.TokenName {
@@ -146,6 +161,7 @@ func find_direct(from, to string) (v []Ticker) {
 	}
 	return
 }
+*/
 
 func find_indirect(from, to string) (T Ticker) {
 	for _, t := range all_tickers {
@@ -182,36 +198,35 @@ func makeMyPath(path *loophole.Path) (r MyPath) {
 	return
 }
 
-func decode(mp MyPath, model int) {
+func tickers(mp MyPath) {
+	fmt.Printf("LIST OF USED TICKERS:\n")
+	from := mp.path[0]
+	for _, to := range mp.path[1:] {
+		T := find_indirect(from, to)
+		spr_lo, spr_hi := T.Buy, T.Sell
+		if spr_hi < spr_lo {
+			spr_lo, spr_hi = spr_hi, spr_lo
+		}
+		fmt.Printf("%s-to-%s: token %s, curr %s, volume %f, spread %f..%f, avg %f\n",
+			from, to, T.TokenName, T.CurrencyName, T.Volume, spr_lo, spr_hi, T.Average)
+		from = to
+	}
+}
+func decode(mp MyPath) {
 	from := mp.path[0]
 	amount := 1.00
-	fmt.Printf("AT START %.8f %s, MODEL #%v\n", amount, from, model)
+	fmt.Printf("AT START %.8f %s\n", amount, from)
 	for _, to := range mp.path[1:] {
 		T := find_indirect(from, to)
 		var action string
 		var price float64
 		var result float64
+		price = find_weight(T.TokenName, T.CurrencyName)
 		if T.CurrencyName == to { // продаём from, получаем to
-			switch model {
-			case GREEDY_MODEL:
-				price = T.Sell
-			case AVERAGE_MODEL:
-				price = (T.Sell + T.Buy) / 2.0
-			case SPEEDY_MODEL:
-				price = T.Buy
-			}
 			result = amount * price * cur_fee_k
 			action = fmt.Sprintf("[%s->%s] sell %s, amount=%.8f[%s] * price=%.8f - %.2f%% = %.8f %s",
 				from, to, from, amount, from, price, cur_fee, result, to)
 		} else { // покупаем to за from
-			switch model {
-			case GREEDY_MODEL:
-				price = T.Buy
-			case AVERAGE_MODEL:
-				price = (T.Sell + T.Buy) / 2.0
-			case SPEEDY_MODEL:
-				price = T.Sell
-			}
 			result = amount / price * cur_fee_k
 			action = fmt.Sprintf("[%s<-%s] buy %s, amount=%.8f[%s] / price=%.8f - %.2f%% = %.8f %s",
 				to, from, to, amount, from, price, cur_fee, result, to)
@@ -243,26 +258,50 @@ func (p *BestPaths) show() {
 	}
 }
 
-var best BestPaths
+type PathsMap map[int]*BestPaths
+
+func (m *PathsMap) add(myp MyPath) {
+	ix := len(myp.path)
+	bp, ok := (*m)[ix]
+	if !ok {
+		bp = new(BestPaths)
+	}
+	bp.add(myp)
+	(*m)[ix] = bp
+}
+
+func (m *PathsMap) show() {
+	ixs := []int{}
+	for ix := range *m {
+		ixs = append(ixs, ix)
+	}
+	sort.Ints(ixs)
+	for _, ix := range ixs {
+		fmt.Printf("-= PATH LENGTH %d =-\n", ix)
+		r :=(*m)[ix]
+		r.show()
+		tickers((*r)[0])
+		decode((*r)[0])
+		fmt.Println("")
+	}
+}
+
+var best PathsMap
 
 func path_processor(path *loophole.Path) bool {
-	(&best).add(makeMyPath(path))
+	mypath := makeMyPath(path)
+	// l := len(*path)
+	// fmt.Printf("path:%v, Len:%v, best:%#v\n", mypath, l, best)
+	(&best).add(mypath)
 	return false
 }
 
-func Loop(token string, model int) {
+func Loop(token string) {
 	fmt.Printf(" === LOOP FOR %s ===\n", token)
 	node := namenodes[token]
-	best = BestPaths(nil)
+	best = make(PathsMap)
 	(&graph).Walk(node, node, path_processor)
 	(&best).show()
-	if len(best) > 0 {
-		//decode(best[0], GREEDY_MODEL)
-		//decode(best[0], AVERAGE_MODEL)
-		//decode(best[0], SPEEDY_MODEL)
-		decode(best[0], model)
-	}
-	fmt.Println("")
 }
 
 func load_yobiway() {
@@ -322,9 +361,9 @@ func play_yobit() {
 	model = AVERAGE_MODEL
 	generate(model)
 	log.Printf("%d edges", len(graph))
-	Loop("rur", model)
-	Loop("usd", model)
-	Loop("btc", model)
+	Loop("rur")
+	Loop("usd")
+	Loop("btc")
 }
 
 func play_bittrex() {
@@ -335,7 +374,7 @@ func play_bittrex() {
 	fmt.Printf("\n### GENERATE MODEL #%d\n\n", model)
 	generate(model)
 	log.Printf("%d edges", len(graph))
-	Loop("BTC", model)
+	Loop("BTC")
 }
 
 func play_ccex() {
@@ -346,7 +385,7 @@ func play_ccex() {
 	fmt.Printf("\n### GENERATE MODEL #%d\n\n", model)
 	generate(model)
 	log.Printf("%d edges", len(graph))
-	Loop("BTC", model)
+	Loop("BTC")
 }
 
 func play_livecoin() {
@@ -357,20 +396,32 @@ func play_livecoin() {
 	fmt.Printf("\n### GENERATE MODEL #%d\n\n", model)
 	generate(model)
 	log.Printf("%d edges", len(graph))
-	Loop("BTC", model)
+	//Loop("BTC", model)
+	Loop("USD")
 }
 
 /// MAIN ///
 
+const PLAY_WITH = "livecoin"
+const CACHED  = false
+
 func main() {
-	var err error = initdb()
+	var err error = boltdb_init()
 	if err != nil {
 		log.Fatalf("database not initialized: %s", err)
 	}
-	defer closedb()
+	defer boltdb_close()
 	session = NewSession()
-	//play_yobit()
-	//play_bittrex()
-	//play_ccex()
-	play_livecoin()
+	switch PLAY_WITH {
+	case "yobit":
+		play_yobit()
+	case "bittrex":
+		play_bittrex()
+	case "ccex":
+		play_ccex()
+	case "livecoin":
+		play_livecoin()
+	default:
+		log.Fatal("UNKNOWN:", PLAY_WITH)
+	}
 }

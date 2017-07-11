@@ -43,7 +43,7 @@ type JBittrexMarketSummaries struct {
 
 func (s *Session) GetBittrexTickers() (v []Ticker, err error) {
 	var data []byte
-	data, err = s.Get("https://bittrex.com/api/v1.1/public/getmarketsummaries")
+	data, err = s.Get("https://bittrex.com/api/v1.1/public/getmarketsummaries", CACHED)
 	if err != nil {
 		return
 	}
