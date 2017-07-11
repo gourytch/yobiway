@@ -138,6 +138,7 @@ func generate(model int) {
 	for token := range namenodes {
 		tokens = append(tokens, token)
 	}
+	sort.Strings(tokens)
 	log.Printf("graph tokens: %v", tokens)
 }
 
