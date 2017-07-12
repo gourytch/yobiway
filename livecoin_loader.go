@@ -1,5 +1,14 @@
 // API URL: https://api.livecoin.net/
 // API DOC: https://www.livecoin.net/api?lang=ru
+/*
+https://api.livecoin.net/info/coinInfo
+https://api.livecoin.net/exchange/restrictions
+https://api.livecoin.net/exchange/ticker
+https://api.livecoin.net/exchange/all/order_book
+https://api.livecoin.net/exchange/order_book?currencyPair={token}/{currency}
+https://api.livecoin.net/exchange/order_book?currencyPair=DIME/USD
+https://api.livecoin.net/exchange/maxbid_minask
+*/
 
 // https://api.livecoin.net/exchange/ticker
 /* [
