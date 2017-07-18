@@ -30,21 +30,21 @@ type TradePair struct {
 }
 
 type Marketplace struct {
-	Pairs map[string]*TradePair // каталог всех торговых пар
-	Currencies map[string]bool // перечень всех токенов-валют на рынке
-	Pricemap map[string]map[string]float64 // словарь токен->имена торговых пар в которых его можно купить-продать
+	Pairs      map[string]*TradePair         // каталог всех торговых пар
+	Currencies map[string]bool               // перечень всех токенов-валют на рынке
+	Pricemap   map[string]map[string]float64 // словарь токен->имена торговых пар в которых его можно купить-продать
 }
 
 type Exchange interface {
-	GetName() string                    // получить имя биржи
-	Refresh() error                     // обновить данные по бирже
-	GetAllTokens() []string             // получить список всех активных токенов, пользующихся на бирже
-	GetAllCurrencies() []string         // получить список всех активных валют, пользующихся на бирже
-	GetMarketplace() *Marketplace   //  получить описание рынка
-	GetTradePair(name string) TradePair // получить отдельную пару
+	GetName() string                     // получить имя биржи
+	Refresh() error                      // обновить данные по бирже
+	GetAllTokens() []string              // получить список всех активных токенов, пользующихся на бирже
+	GetAllCurrencies() []string          // получить список всех активных валют, пользующихся на бирже
+	GetMarketplace() *Marketplace        //  получить описание рынка
+	GetTradePair(name string) *TradePair // получить отдельную пару
 }
 
-var ExchangesRegistry map[string]Exchange
+var ExchangesRegistry map[string]Exchange = make(map[string]Exchange)
 
 func RegisterExchange(xcg Exchange) error {
 	name := xcg.GetName()
@@ -57,16 +57,13 @@ func RegisterExchange(xcg Exchange) error {
 
 func NewMarketplace() *Marketplace {
 	mp := new(Marketplace)
-	mp.Currencies = nil // make(map[string]bool)
-	mp.Pairs = nil // make(map[string]*TradePair)
-	mp.Pricemap = nil // make(map[string]map[string]float64)
+	mp.Currencies = make(map[string]bool)
+	mp.Pairs = make(map[string]*TradePair)
+	mp.Pricemap = make(map[string]map[string]float64)
 	return mp
 }
 
 func (mp *Marketplace) SetPrice(from, to string, price float64) {
-	if mp.Pricemap == nil {
-		mp.Pricemap = make(map[string]map[string]float64)
-	}
 	if mp.Pricemap[from] == nil {
 		mp.Pricemap[from] = make(map[string]float64)
 	}
@@ -77,15 +74,15 @@ func (mp *Marketplace) Add(tp *TradePair) {
 	mp.Pairs[tp.Name] = tp
 	mp.Currencies[tp.Currency] = true
 	mp.SetPrice(tp.Token, tp.Currency, tp.Vwap)
-	mp.SetPrice(tp.Currency, tp.Token, 1.0 / tp.Vwap)
+	mp.SetPrice(tp.Currency, tp.Token, 1.0/tp.Vwap)
 }
 
 func (mp *Marketplace) FilterByToken(token string) []*TradePair {
 	dsts := mp.Pricemap[token]
-	V :=make([]*TradePair, len(dsts))
+	V := make([]*TradePair, len(dsts))
 	ix := 0
 	for dst := range dsts {
-		V[ix] = mp.Pairs[token + "/" + dst]
+		V[ix] = mp.Pairs[token+"/"+dst]
 		ix++
 	}
 	return V

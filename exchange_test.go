@@ -7,11 +7,20 @@ func TestNewMarketplace(t *testing.T) {
 	if mp == nil {
 		t.Error("NewMarketplace returned nil")
 	}
+	if mp.Pairs == nil {
+		t.Error("Pairs is nil")
+	}
 	if len(mp.Pairs) != 0 {
 		t.Error("Pairs not empty")
 	}
+	if mp.Currencies == nil {
+		t.Error("Currencies is nil")
+	}
 	if len(mp.Currencies) != 0 {
 		t.Error("Currencies not empty")
+	}
+	if mp.Pricemap == nil {
+		t.Error("Pricemap is nil")
 	}
 	if len(mp.Pricemap) != 0 {
 		t.Error("Pricemap not empty")
@@ -99,5 +108,113 @@ func TestMarketplace_Add(t *testing.T) {
 	}
 	if price != 1.0/10.00 {
 		t.Error("Pricemap[CURN][TOKN] != 1.0 / 10.00")
+	}
+}
+
+func TestMarketplace_FilterByToken(t *testing.T) {
+	mp := NewMarketplace()
+	mp.Add(&TradePair{Token: "FOO", Currency: "CURN", Name: "FOO/CURN", Vwap: 10.00})
+	mp.Add(&TradePair{Token: "BAR", Currency: "CURN", Name: "BAR/CURN", Vwap: 0.01})
+	Vbad := mp.FilterByToken("BAD")
+	if Vbad == nil {
+		t.Error("FilterByToken(BAD) returned nil")
+	}
+	if len(Vbad) != 0 {
+		t.Error("FilterByToken(BAD) returned non-empty")
+	}
+	Vfoo := mp.FilterByToken("FOO")
+	if Vfoo == nil {
+		t.Error("FilterByToken(FOO) returned nil")
+	}
+	if len(Vfoo) != 1 {
+		t.Errorf("FilterByToken(FOO) must be single, not %v", len(Vfoo))
+	}
+	if Vfoo[0].Token != "FOO" {
+		t.Errorf("FilterByToken(FOO) return wrong tradepair: %v", Vfoo[0])
+	}
+	Vbar := mp.FilterByToken("BAR")
+	if Vfoo == nil {
+		t.Error("FilterByToken(BAR) returned nil")
+	}
+	if len(Vbar) != 1 {
+		t.Errorf("FilterByToken(BAR) must be single, not %v", len(Vbar))
+	}
+	if Vbar[0].Token != "BAR" {
+		t.Errorf("FilterByToken(BAR) return wrong tradepair: %v", Vbar[0])
+	}
+	Vcurn := mp.FilterByToken("CURN")
+	if Vcurn == nil {
+		t.Error("FilterByToken(CURN) returned nil")
+	}
+	if len(Vcurn) != 2 {
+		t.Errorf("FilterByToken(BAR) must be two, not %v", len(Vcurn))
+	}
+}
+
+// test Exchange //
+
+type ACMEExchange struct{}
+
+func (x *ACMEExchange) GetName() string {
+	return "ACME"
+}
+
+func (x *ACMEExchange) Refresh() error {
+	return nil
+}
+
+func (x *ACMEExchange) GetAllTokens() []string {
+	return []string{"TOKN", "CURN"}
+}
+
+func (x *ACMEExchange) GetAllCurrencies() []string {
+	return []string{"BAR"}
+}
+
+func (x *ACMEExchange) GetMarketplace() *Marketplace {
+	mp := new(Marketplace)
+	tp := new(TradePair)
+	tp.Token = "TOKN"
+	tp.Currency = "CURN"
+	tp.Name = "TOKN/CURN"
+	tp.Vwap = 10.00
+	mp.Add(tp)
+	return mp
+}
+
+func (x *ACMEExchange) GetTradePair(name string) *TradePair {
+	if name != "TOKN/CURN" {
+		return nil
+	}
+	tp := new(TradePair)
+	tp.Token = "TOKN"
+	tp.Currency = "CURN"
+	tp.Name = "TOKN/CURN"
+	tp.Vwap = 10.00
+	return tp
+}
+
+var ACME *ACMEExchange = new(ACMEExchange)
+
+func TestRegisterExchange(t *testing.T) {
+	if ExchangesRegistry == nil {
+		t.Error("ExchangesRegistry is nil")
+	}
+	if len(ExchangesRegistry) != 0 {
+		t.Error("ExchangesRegistry not empty")
+	}
+	err := RegisterExchange(ACME)
+	if err != nil {
+		t.Errorf("RegisterExchange(ACME) returned error: %v", err)
+	}
+	acme, ok := ExchangesRegistry["ACME"]
+	if !ok {
+		t.Error("ExchangesRegistry[ACME] not found")
+	}
+	if acme == nil {
+		t.Error("ExchangesRegistry[ACME] is nil")
+	}
+	if acme.GetName() != "ACME" {
+		t.Error("acme has wrong name")
 	}
 }

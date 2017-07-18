@@ -25,7 +25,7 @@ type ExchangeList []string
 // добыть список использующихся у нас бирж
 func (cc *CryptoCycle) ListExchanges(args *NoArgs, result *ExchangeList) error {
 	var L ExchangeList
-	for name := range XCGS {
+	for name := range ExchangesRegistry {
 		L = append(L, name)
 	}
 	sort.Sort(Alphabetically(L))
@@ -43,15 +43,15 @@ type TokenList []string
 // добыть список использующихся на бирже токенов
 func (cc *CryptoCycle) ListTokens(args *ExchangeArgs, result *TokenList) error {
 	var T TokenList
-	xcg, ok := XCGS[args.Exchange]
+	xcg, ok := ExchangesRegistry[args.Exchange]
 	if !ok {
 		result = &T
 		return fmt.Errorf("unknown exchange: `%s`", args.Exchange)
 	}
 	if args.Currencies {
-		T = TokenList(xcg.GetCurrencies())
+		T = TokenList(xcg.GetAllCurrencies())
 	} else {
-		T = TokenList(xcg.GetTokens())
+		T = TokenList(xcg.GetAllTokens())
 	}
 	return nil
 }
