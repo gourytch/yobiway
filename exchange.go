@@ -70,6 +70,20 @@ func (mp *Marketplace) SetPrice(from, to string, price float64) {
 	mp.Pricemap[from][to] = price
 }
 
+func (mp *Marketplace) GetPrice(from, to string) (price float64, err error) {
+	M, ok := mp.Pricemap[from]
+	if !ok {
+		err = fmt.Errorf("token %v not exists", from)
+		return
+	}
+	price, ok = M[to]
+	if !ok {
+		err = fmt.Errorf("no way for direction %v->%v", from, to)
+		return
+	}
+	return
+}
+
 func (mp *Marketplace) Add(tp *TradePair) {
 	mp.Pairs[tp.Name] = tp
 	mp.Currencies[tp.Currency] = true

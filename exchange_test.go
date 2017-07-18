@@ -49,6 +49,47 @@ func TestMarketplace_SetPrice(t *testing.T) {
 	}
 }
 
+func TestMarketplace_GetPrice(t *testing.T) {
+	mp := NewMarketplace()
+	mp.SetPrice("FOO", "BAR", 123.456)
+	var price float64
+	var err error
+
+	price,err = mp.GetPrice("FOO", "BAR")
+	if err != nil {
+		t.Error("GetPrice(FOO,BAR) must return no error")
+	}
+	if price != 123.456 {
+		t.Error("GetPrice(FOO,BAR) must return 123.456")
+	}
+	price,err = mp.GetPrice("BAR", "FOO")
+	if err == nil {
+		t.Error("GetPrice(BAR,FOO) must return error")
+	}
+
+	mp.SetPrice("BAR", "FOO", 654.321)
+	price, err = mp.GetPrice("BAR", "FOO")
+	if err != nil {
+		t.Error("GetPrice(BAR,FOO) must return no error")
+	}
+	if price != 654.321 {
+		t.Error("GetPrice(BAR,FOO) must return 654.321")
+	}
+
+	price,err = mp.GetPrice("KAKA", "BYAKA")
+	if err == nil {
+		t.Error("GetPrice(KAKA,BYAKA) must return error")
+	}
+	price,err = mp.GetPrice("FOO", "BYAKA")
+	if err == nil {
+		t.Error("GetPrice(FOO,BYAKA) must return error")
+	}
+	price,err = mp.GetPrice("KAKA", "BAR")
+	if err == nil {
+		t.Error("GetPrice(FOO,BYAKA) must return error")
+	}
+}
+
 func TestMarketplace_Add(t *testing.T) {
 	mp := NewMarketplace()
 	tp := new(TradePair)
