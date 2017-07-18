@@ -258,4 +258,9 @@ func TestRegisterExchange(t *testing.T) {
 	if acme.GetName() != "ACME" {
 		t.Error("acme has wrong name")
 	}
+	err = RegisterExchange(ACME)
+	if err == nil {
+		t.Error("RegisterExchange(ACME) must returned error")
+	}
+
 }
