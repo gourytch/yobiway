@@ -3,6 +3,7 @@ package livecoin
 import (
 	"encoding/json"
 	"strconv"
+	"github.com/gourytch/yobiway/client"
 )
 
 /*
@@ -53,15 +54,15 @@ type Orderbook struct {
 	Bids Orders
 }
 
-func (x *LivecoinExchange) load_jorderbooks() error {
+func (x *LivecoinExchange) load_orderbooks() error {
 	var data []byte
 	var err error
 
-	if data, err = x.s.Get("https://api.livecoin.net/exchange/restrictions", false); err != nil {
+	if data, err = x.s.Get("https://api.livecoin.net/exchange/all/order_book", client.CACHED_MODE); err != nil {
 		return err
 	}
 
-	if err = json.Unmarshal(data, &x.jrestrictions); err != nil {
+	if err = json.Unmarshal(data, &x.jorderbooks); err != nil {
 		return err
 	}
 	return nil
@@ -99,7 +100,7 @@ func summarize_orders(V Orders) (value, price float64) {
 	return
 }
 
-func (x *LivecoinExchange) apply_jorderbooks() {
+func (x *LivecoinExchange) apply_orderbooks() {
 	var J JOrderbook
 	var name string
 	for name, J = range x.jorderbooks {

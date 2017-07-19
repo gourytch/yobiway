@@ -18,6 +18,7 @@ package livecoin
 import (
 	"encoding/json"
 	"github.com/gourytch/yobiway/exchange"
+	"github.com/gourytch/yobiway/client"
 )
 
 type JLivecoinRestriction struct {
@@ -36,7 +37,7 @@ func (x *LivecoinExchange) load_restrictions() error {
 	var data []byte
 	var err error
 
-	if data, err = x.s.Get("https://api.livecoin.net/exchange/restrictions", false); err != nil {
+	if data, err = x.s.Get("https://api.livecoin.net/exchange/restrictions", client.CACHED_MODE); err != nil {
 		return err
 	}
 	if err = json.Unmarshal(data, &x.jrestrictions); err != nil {

@@ -33,6 +33,7 @@ package yobit
 import (
 	"encoding/json"
 	"sort"
+	"github.com/gourytch/yobiway/client"
 )
 
 type JYobitPair struct {
@@ -57,7 +58,7 @@ type JYobitPairs struct {
 func (x *YobitExchange) load_pairs() error {
 	var data []byte
 	var err error
-	if data, err = x.s.Get("https://yobit.net/api/3/info", false); err != nil {
+	if data, err = x.s.Get("https://yobit.net/api/3/info", client.CACHED_MODE); err != nil {
 		return err
 	}
 	if err = json.Unmarshal(data, &x.jpairs); err != nil {

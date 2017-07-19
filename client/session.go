@@ -12,6 +12,8 @@ const (
 	REQ_INTERVAL = 1 * time.Second
 )
 
+var CACHED_MODE = false
+
 type Session struct {
 	Client *http.Client
 	LastRq time.Time

@@ -25,6 +25,7 @@ import (
 	"github.com/gourytch/yobiway/exchange"
 	"strings"
 	"fmt"
+	"github.com/gourytch/yobiway/client"
 )
 
 type JLivecoinTicker struct {
@@ -47,7 +48,7 @@ func (x *LivecoinExchange) load_jtickers() error {
 	var data []byte
 	var err error
 
-	if data, err = x.s.Get("https://api.livecoin.net/exchange/ticker", false); err != nil {
+	if data, err = x.s.Get("https://api.livecoin.net/exchange/ticker", client.CACHED_MODE); err != nil {
 		return err
 	}
 	if err = json.Unmarshal(data, &x.jtickers); err != nil {
@@ -62,7 +63,7 @@ func (x *LivecoinExchange) refresh_tokens() error {
 		V := strings.Split(J.Symbol, "/")
 		tp := &exchange.TradePair{
 			Name:        J.Symbol,
-			URL:         fmt.Sprintf("https://www.livecoin.net/en/trade/index?currencyPair=%s%%2F%s",J.Symbol, V[1]),
+			URL:         fmt.Sprintf("https://www.livecoin.net/en/trade/index?currencyPair=%s", J.Symbol),
 			Token:       J.Token,
 			Currency:    V[1],
 			Vwap:        J.VWap,

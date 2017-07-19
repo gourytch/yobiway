@@ -41,6 +41,10 @@ func (x *LivecoinExchange) Refresh() error {
 		return err
 	}
 	x.apply_restrictions()
+	if err = x.load_orderbooks(); err != nil {
+		return err
+	}
+	x.apply_orderbooks()
 	return nil
 }
 

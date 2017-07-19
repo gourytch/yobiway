@@ -32,6 +32,7 @@ import (
 	"encoding/json"
 	"strings"
 	"github.com/gourytch/yobiway/exchange"
+	"github.com/gourytch/yobiway/client"
 )
 
 const MAX_TICKERS_REQ = 50
@@ -64,7 +65,7 @@ func (x *YobitExchange) load_tickers() error {
 		//log.Printf("process slice [%d:%d]", offs, r)
 		P := x.pairnames[offs:r]
 		Ps := strings.Join(P, "-")
-		if data, err = x.s.Get("https://yobit.net/api/3/ticker/"+Ps, false); err != nil {
+		if data, err = x.s.Get("https://yobit.net/api/3/ticker/"+Ps, client.CACHED_MODE); err != nil {
 			return err
 		}
 		var j JYobitTickers
