@@ -351,6 +351,7 @@ func main() {
 		fmt.Printf("! UNKNOWN EXCHANGE: %v\n", xcgName)
 		os.Exit(1)
 	}
+	fmt.Println("; load data")
 	if err = xcg.Refresh(); err != nil {
 		fmt.Printf("! DATA LOAD ERROR: %v\n", err)
 		os.Exit(1)
