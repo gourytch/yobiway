@@ -3,15 +3,14 @@ package main
 import (
 	"fmt"
 	"log"
-	"math"
-	"sort"
-	//	"sort"
 	"strings"
 
 	"github.com/gourytch/loophole"
 	"flag"
 	"github.com/gourytch/yobiway/client"
 	"github.com/gourytch/yobiway/exchange/livecoin"
+	"sort"
+	"github.com/gourytch/yobiway/exchange"
 )
 
 
@@ -36,8 +35,7 @@ var graph loophole.Graph = loophole.Graph{}
 var cur_fee float64
 var cur_fee_k float64
 
-//var all_pairs []string
-var all_tickers []Ticker
+var xcg exchange.Exchange
 
 const (
 	GREEDY_MODEL  = iota
@@ -58,83 +56,50 @@ func SplitPair(s string) (token, currency string, err error) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-func generate(model int) {
+func generate() {
 	nodenames = NodeNames{}
 	namenodes = NameNodes{}
 	var nextnode loophole.Node = 1
 	graph = loophole.Graph{}
-	log.Printf("generate graph from %d tickers, model #%d", len(all_tickers), model)
-	for _, ticker := range all_tickers {
-		//		log.Printf("")
-		//		(&ticker).log()
+	mp := xcg.GetMarketplace()
+	log.Printf("generate graph from pricemap")
+	for from, Vto := range mp.Pricemap {
 		var ok bool
 		var node_from loophole.Node
 		var node_to loophole.Node
-		var weight_fwd loophole.Weight
-		var weight_back loophole.Weight
 
-		node_from, ok = namenodes[ticker.TokenName]
+		node_from, ok = namenodes[from]
 		if !ok {
 			node_from = nextnode
 			nextnode++
-			namenodes[ticker.TokenName] = node_from
-			nodenames[node_from] = ticker.TokenName
+			namenodes[from] = node_from
+			nodenames[node_from] = from
 		}
-		node_to, ok = namenodes[ticker.CurrencyName]
-		if !ok {
-			node_to = nextnode
-			nextnode++
-			namenodes[ticker.CurrencyName] = node_to
-			nodenames[node_to] = ticker.CurrencyName
-		}
-		//pairname := ticker.TokenName + "_" + ticker.CurrencyName
+		for to, price := range Vto {
+			pair := xcg.GetTradePair(from + "/" + to)
+			if pair == nil {
+				pair = xcg.GetTradePair(to + "/" + from)
+			}
+			node_to, ok = namenodes[to]
+			if !ok {
+				node_to = nextnode
+				nextnode++
+				namenodes[to] = node_to
+				nodenames[node_to] = to
+			}
 		// check for prices
-		if ticker.Sell < MIN_PRICE || ticker.Buy < MIN_PRICE {
-			//log.Printf("skip ticker %s by price (sell=%.8f, buy=%.8f)", pairname, ticker.Sell, ticker.Buy)
-			continue
-		}
+			if price < MIN_PRICE {
+				//log.Printf("skip ticker %s by price (sell=%.8f, buy=%.8f)", pairname, ticker.Sell, ticker.Buy)
+				continue
+			}
 		// check distance
-		spread_min := math.Min(ticker.Buy, ticker.Sell)
-		spread_max := math.Max(ticker.Buy, ticker.Sell)
-		avg_price := ticker.Average
-		dta_price := spread_max - spread_min
-		dsp_price := dta_price * dta_price / avg_price
-		if MAX_DISPERSION < dsp_price {
-			//log.Printf("skip ticker %s by dispersion (avg=%.6f, delta=%.6f, disp=%.6f", pairname, avg_price, dta_price, dsp_price)
-			continue
-		}
-		if ticker.CurrentVolume < MIN_VOLUME {
-			//log.Printf("skip ticker %s by volume %.6f", pairname, ticker.CurrentVolume)
-			continue
-		}
-		switch model {
-		case GREEDY_MODEL: // покупаем по цене закупа, продаём по продажной
-			weight_fwd = loophole.Weight(spread_max * cur_fee_k)
-			weight_back = loophole.Weight((1.0 / spread_min) * cur_fee_k)
-		case AVERAGE_MODEL: // покупаем и продаём по средней цене
-			weight_fwd = loophole.Weight(avg_price * cur_fee_k)
-			weight_back = loophole.Weight((1.0 / avg_price) * cur_fee_k)
-		case SPEEDY_MODEL: // покупаем что продадут и продаём что купят
-			weight_fwd = loophole.Weight(spread_min * cur_fee_k)
-			weight_back = loophole.Weight((1.0 / spread_max) * cur_fee_k)
-		}
-		//loopcost := weight_fwd * weight_back
-		//if loopcost > 1.0 {
-		//	log.Printf("skip ticker %s due OVERLOOP: %.8f * %.8f = %.8f", pairname, weight_fwd, weight_back, loopcost)
-		//	continue
-		//}
-		forw := loophole.Edge{
-			From:   node_from,
-			To:     node_to,
-			Weight: weight_fwd,
-		}
-		back := loophole.Edge{
-			From:   node_to,
-			To:     node_from,
-			Weight: weight_back,
+			if pair.Volume < MIN_VOLUME {
+				//log.Printf("skip ticker %s by volume %.6f", pairname, ticker.CurrentVolume)
+				continue
+			}
+			graph = append(graph, loophole.Edge{From:node_from, To: node_to, Weight: loophole.Weight(price)})
 		}
 		//log.Printf("add ticker %s to graph", pairname)
-		graph = append(graph, forw, back)
 	}
 	tokens := []string{}
 	for token := range namenodes {
@@ -156,38 +121,16 @@ func find_weight(from, to string) float64 {
 	return -1
 }
 
-////
-/*
-func find_direct(from, to string) (v []Ticker) {
-	for _, t := range all_tickers {
-		if from != "" && from != t.TokenName {
-			continue
-		}
-		if to != "" && to != t.CurrencyName {
-			continue
-		}
-		v = append(v, t)
+func find_indirect(from, to string) (tp *exchange.TradePair) {
+	tp = xcg.GetTradePair(from + "/" + to)
+	if tp != nil {
+		return
 	}
-	return
-}
-*/
-
-func find_indirect(from, to string) (T Ticker) {
-	for _, t := range all_tickers {
-		if from == t.TokenName && to == t.CurrencyName {
-			return t
-		}
-		if from == t.CurrencyName && to == t.TokenName {
-			return t
-		}
+	tp = xcg.GetTradePair(to + "/" + from)
+	if tp != nil {
+		return
 	}
-	log.Fatalf("========== ticker names ===========")
-	for _, t := range all_tickers {
-		log.Printf("    %s_%s", t.CurrencyName, t.TokenName)
-	}
-	log.Fatalf("=========-= --- end --- ===========")
-
-	log.Fatalf("ticker %s_%s lost", from, to)
+	log.Fatalf("ticker %s,%s lost", from, to)
 	return
 }
 
@@ -212,12 +155,8 @@ func tickers(mp MyPath) {
 	from := mp.path[0]
 	for _, to := range mp.path[1:] {
 		T := find_indirect(from, to)
-		spr_lo, spr_hi := T.Buy, T.Sell
-		if spr_hi < spr_lo {
-			spr_lo, spr_hi = spr_hi, spr_lo
-		}
-		fmt.Printf("%s-to-%s: token %s, curr %s, volume %f, spread %f..%f, avg %f\n",
-			from, to, T.TokenName, T.CurrencyName, T.Volume, spr_lo, spr_hi, T.Average)
+		fmt.Printf("%s-to-%s: token %s, curr %s, volume %f, avg %f\n",
+			from, to, T.Token, T.Currency, T.Volume, T.Vwap)
 		from = to
 	}
 }
@@ -230,8 +169,8 @@ func decode(mp MyPath) {
 		var action string
 		var price float64
 		var result float64
-		price = find_weight(T.TokenName, T.CurrencyName)
-		if T.CurrencyName == to { // продаём from, получаем to
+		price = find_weight(T.Token, T.Currency)
+		if T.Currency == to { // продаём from, получаем to
 			result = amount * price * cur_fee_k
 			action = fmt.Sprintf("[%s->%s] sell %s, amount=%.8f[%s] * price=%.8f - %.2f%% = %.8f %s",
 				from, to, from, amount, from, price, cur_fee, result, to)
@@ -313,112 +252,19 @@ func Loop(token string) {
 	(&best).show()
 }
 
-func load_yobiway() {
-	pairs, err := session.GetPairs()
-	if err != nil {
-		log.Printf("ERROR: %s\n", err)
-		return
-	} else {
-		log.Printf("%d pairs\n", len(pairs))
-	}
-	sort.Sort(Alphabetically(pairs))
-
-	all_tickers, err = session.GetTickers(pairs)
-	if err != nil {
-		log.Printf("ERROR: %s", err)
-	} else {
-		log.Printf("%d tickers\n", len(all_tickers))
-	}
-}
-
-func load_bittrex() {
-	var err error
-	all_tickers, err = session.GetBittrexTickers()
-	if err != nil {
-		log.Printf("ERROR: %s", err)
-	} else {
-		log.Printf("%d tickers\n", len(all_tickers))
-	}
-}
-
-func load_ccex() {
-	var err error
-	all_tickers, err = session.GetCCexTickers()
-	if err != nil {
-		log.Printf("ERROR: %s", err)
-	} else {
-		log.Printf("%d tickers\n", len(all_tickers))
-	}
-}
-
-func load_livecoin() {
-	var err error
-	if err = livecoin.Refresh(); err != nil {
-		log.Printf("ERROR: %s", err)
-		return
-	}
-	mp := livecoin.GetAllTokens()
-
-}
-
-func play_yobit(token string) {
-	load_yobiway()
-	cur_fee = YOBI_FEE
-	cur_fee_k = YOBI_FEE_K
-	var model int
-	fmt.Printf("\n### GENERATE AVERAGE MODEL\n\n")
-	model = AVERAGE_MODEL
-	generate(model)
-	log.Printf("%d edges", len(graph))
-	Loop(token)
-}
-
-func play_bittrex(token string) {
-	load_bittrex()
-	cur_fee = BITTREX_FEE
-	cur_fee_k = BITTREX_FEE_K
-	model := AVERAGE_MODEL
-	fmt.Printf("\n### GENERATE MODEL #%d\n\n", model)
-	generate(model)
-	log.Printf("%d edges", len(graph))
-	Loop(token)
-}
-
-func play_ccex(token string) {
-	load_ccex()
-	cur_fee = BITTREX_FEE
-	cur_fee_k = BITTREX_FEE_K
-	model := AVERAGE_MODEL
-	fmt.Printf("\n### GENERATE MODEL #%d\n\n", model)
-	generate(model)
-	log.Printf("%d edges", len(graph))
-	Loop(token)
-}
-
-func play_livecoin(token string) {
-	load_livecoin()
-	cur_fee = BITTREX_FEE
-	cur_fee_k = BITTREX_FEE_K
-	model := AVERAGE_MODEL
-	fmt.Printf("\n### GENERATE MODEL #%d\n\n", model)
-	generate(model)
-	log.Printf("%d edges", len(graph))
-	Loop(token)
-}
-
 /// MAIN ///
 var CACHED = true
 
 func main() {
-	var exchange string
+	var xcgName string
 	var token string
-	flag.StringVar(&exchange, "exchange", "livecoin", "exchange to analyze")
+	flag.StringVar(&xcgName, "exchange", "livecoin", "exchange to analyze")
 	flag.StringVar(&token,"token", "BTC", "token to cycle")
 	flag.BoolVar(&CACHED, "cached", true, "load from cache")
 	flag.Parse()
-	exchange = strings.ToUpper(exchange)
+	xcgName = strings.ToUpper(xcgName)
 	token = strings.ToUpper(token)
-	log.Printf("exchange=%v, token=%v, cached=%v", exchange, token, CACHED)
+	log.Printf("exchange=%v, token=%v, cached=%v", xcgName, token, CACHED)
 
 	var err error = client.BoltDB_init()
 	if err != nil {
@@ -426,16 +272,25 @@ func main() {
 	}
 	defer client.BoltDB_close()
 	session = client.NewSession()
-	switch exchange {
-	case "YOBIT":
-		play_yobit(token)
-	case "BITTREX":
-		play_bittrex(token)
-	case "CCEX":
-		play_ccex(token)
+	switch xcgName {
+	//case "YOBIT":
+	//	play_yobit(token)
+	//case "BITTREX":
+	//	play_bittrex(token)
+	//case "CCEX":
+	//	play_ccex(token)
 	case "LIVECOIN":
-		play_livecoin(token)
+		livecoin.Register()
+		xcg = exchange.Registry["LIVECOIN"]
+		cur_fee = BITTREX_FEE
+		cur_fee_k = BITTREX_FEE_K
 	default:
-		log.Fatal("UNKNOWN EXCHANGE:", exchange)
+		log.Fatal("UNKNOWN EXCHANGE:", xcgName)
 	}
+	xcg.Refresh()
+	fmt.Printf("\n### GENERATE ###\n\n")
+	generate()
+	log.Printf("%d edges", len(graph))
+	Loop(token)
+
 }

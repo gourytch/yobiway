@@ -7,6 +7,7 @@ import (
 	"log"
 	"sort"
 	"fmt"
+	"github.com/gourytch/yobiway/exchange"
 )
 
 // КРИПТОЦЫКЛ! ВЖЖЖЖЖ!!!!!
@@ -25,10 +26,10 @@ type ExchangeList []string
 // добыть список использующихся у нас бирж
 func (cc *CryptoCycle) ListExchanges(args *NoArgs, result *ExchangeList) error {
 	var L ExchangeList
-	for name := range ExchangesRegistry {
+	for name := range exchange.Registry {
 		L = append(L, name)
 	}
-	sort.Sort(Alphabetically(L))
+	sort.Strings(L)
 	result = &L
 	return nil
 }
@@ -43,7 +44,7 @@ type TokenList []string
 // добыть список использующихся на бирже токенов
 func (cc *CryptoCycle) ListTokens(args *ExchangeArgs, result *TokenList) error {
 	var T TokenList
-	xcg, ok := ExchangesRegistry[args.Exchange]
+	xcg, ok := exchange.Registry[args.Exchange]
 	if !ok {
 		result = &T
 		return fmt.Errorf("unknown exchange: `%s`", args.Exchange)
