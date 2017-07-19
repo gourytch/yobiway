@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"github.com/gourytch/yobiway/exchange"
 	"strings"
+	"fmt"
 )
 
 type JLivecoinTicker struct {
@@ -61,7 +62,7 @@ func (x *LivecoinExchange) refresh_tokens() error {
 		V := strings.Split(J.Symbol, "/")
 		tp := &exchange.TradePair{
 			Name:        J.Symbol,
-			URL:         "",
+			URL:         fmt.Sprintf("https://www.livecoin.net/en/trade/index?currencyPair=%s%%2F%s",J.Symbol, V[1]),
 			Token:       J.Token,
 			Currency:    V[1],
 			Vwap:        J.VWap,

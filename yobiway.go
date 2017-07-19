@@ -27,32 +27,15 @@ var BEST_LIMIT int = 3
 type NodeNames map[loophole.Node]string
 type NameNodes map[string]loophole.Node
 
-var session *client.Session
+var banlist = make(map[string]bool)
 
-var nodenames NodeNames = NodeNames{}
-var namenodes NameNodes = NameNodes{}
-var graph loophole.Graph = loophole.Graph{}
+var nodenames = NodeNames{}
+var namenodes = NameNodes{}
+var graph = loophole.Graph{}
 var cur_fee float64
 var cur_fee_k float64
 
 var xcg exchange.Exchange
-
-const (
-	GREEDY_MODEL  = iota
-	AVERAGE_MODEL
-	SPEEDY_MODEL
-)
-
-///
-
-func SplitPair(s string) (token, currency string, err error) {
-	v := strings.Split(s, "_")
-	if len(v) != 2 {
-		err = fmt.Errorf("bad number of parts in the '%s'", s)
-		return
-	}
-	return v[0], v[1], nil
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -63,7 +46,12 @@ func generate() {
 	graph = loophole.Graph{}
 	mp := xcg.GetMarketplace()
 	log.Printf("generate graph from pricemap")
-	for from, Vto := range mp.Pricemap {
+	Vfrom := xcg.GetAllTokens()
+	sort.Strings(Vfrom)
+	for _, from := range Vfrom {
+		if banlist[from] {
+			continue
+		}
 		var ok bool
 		var node_from loophole.Node
 		var node_to loophole.Node
@@ -75,7 +63,19 @@ func generate() {
 			namenodes[from] = node_from
 			nodenames[node_from] = from
 		}
-		for to, price := range Vto {
+		Mto := mp.Pricemap[from]
+		Vto := make([]string, len(Mto))
+		ix := 0
+		for k,_ := range Mto {
+			Vto[ix] = k
+			ix++
+		}
+		sort.Strings(Vto)
+		for _, to := range Vto {
+			if banlist[to] {
+				continue
+			}
+			price := Mto[to]
 			pair := xcg.GetTradePair(from + "/" + to)
 			if pair == nil {
 				pair = xcg.GetTradePair(to + "/" + from)
@@ -89,14 +89,27 @@ func generate() {
 			}
 		// check for prices
 			if price < MIN_PRICE {
-				//log.Printf("skip ticker %s by price (sell=%.8f, buy=%.8f)", pairname, ticker.Sell, ticker.Buy)
+				//log.Printf("skip ticker %s by price %.6f", pair.Name, pair.Vwap)
 				continue
 			}
-		// check distance
 			if pair.Volume < MIN_VOLUME {
-				//log.Printf("skip ticker %s by volume %.6f", pairname, ticker.CurrentVolume)
+				log.Printf("skip ticker %s by total volume %.6f", pair.Name, pair.Volume)
 				continue
 			}
+			if pair.Volume24H < MIN_VOLUME {
+				log.Printf("skip ticker %s by daily volume %.6f", pair.Name, pair.Volume24H)
+				continue
+			}
+/*
+			if pair.Volume_Asks < MIN_VOLUME {
+				log.Printf("skip ticker %s by asks volume %.6f", pair.Name, pair.Volume_Asks)
+				continue
+			}
+			if pair.Volume_Bids < MIN_VOLUME {
+				log.Printf("skip ticker %s by bids volume %.6f", pair.Name, pair.Volume_Bids)
+				continue
+			}
+*/
 			graph = append(graph, loophole.Edge{From:node_from, To: node_to, Weight: loophole.Weight(price)})
 		}
 		//log.Printf("add ticker %s to graph", pairname)
@@ -235,12 +248,14 @@ func (m *PathsMap) show() {
 }
 
 var best PathsMap
+var botb BestPaths
 
 func path_processor(path *loophole.Path) bool {
 	mypath := makeMyPath(path)
 	// l := len(*path)
 	// fmt.Printf("path:%v, Len:%v, best:%#v\n", mypath, l, best)
 	(&best).add(mypath)
+	(&botb).add(mypath)
 	return false
 }
 
@@ -250,28 +265,43 @@ func Loop(token string) {
 	best = make(PathsMap)
 	(&graph).Walk(node, node, path_processor)
 	(&best).show()
+	(&botb).show()
 }
 
-/// MAIN ///
-var CACHED = true
+func Way(from, to string) {
+	fmt.Printf(" === WAY FROM %s TO %s ===\n", from, to)
+	node_from := namenodes[from]
+	node_to := namenodes[to]
+	best = make(PathsMap)
+	(&graph).Walk(node_from, node_to, path_processor)
+	(&best).show()
+	(&botb).show()
+}
 
 func main() {
 	var xcgName string
-	var token string
+	var from string
+	var to string
+	var exclude string
 	flag.StringVar(&xcgName, "exchange", "livecoin", "exchange to analyze")
-	flag.StringVar(&token,"token", "BTC", "token to cycle")
-	flag.BoolVar(&CACHED, "cached", true, "load from cache")
+	flag.StringVar(&from,"from", "BTC", "token to start")
+	flag.StringVar(&to,"to", "BTC", "token to finish")
+	flag.StringVar(&exclude,"exclude", "", "tokens to exclude")
 	flag.Parse()
 	xcgName = strings.ToUpper(xcgName)
-	token = strings.ToUpper(token)
-	log.Printf("exchange=%v, token=%v, cached=%v", xcgName, token, CACHED)
+	from = strings.ToUpper(from)
+	to = strings.ToUpper(to)
+	exclude = strings.ToUpper(exclude)
+	log.Printf("exchange=%v, from=%v, to=%v, exclude=%v", xcgName, from, to, exclude)
+	for _, s := range strings.Split(exclude,",") {
+		banlist[s] = true
+	}
 
 	var err error = client.BoltDB_init()
 	if err != nil {
 		log.Fatalf("database not initialized: %s", err)
 	}
 	defer client.BoltDB_close()
-	session = client.NewSession()
 	switch xcgName {
 	//case "YOBIT":
 	//	play_yobit(token)
@@ -291,6 +321,9 @@ func main() {
 	fmt.Printf("\n### GENERATE ###\n\n")
 	generate()
 	log.Printf("%d edges", len(graph))
-	Loop(token)
-
+	if from == to {
+		Loop(from)
+	} else {
+		Way(from, to)
+	}
 }
