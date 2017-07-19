@@ -13,11 +13,6 @@ import (
 	"os"
 )
 
-var YOBI_FEE float64 = 0.2
-var YOBI_FEE_K float64 = (1.0 - YOBI_FEE/100.0)
-var BITTREX_FEE float64 = 0.25
-var BITTREX_FEE_K float64 = (1.0 - BITTREX_FEE/100.0)
-
 var MIN_PRICE float64 = 0.00000100 // 0.0000001
 var MIN_VOLUME float64 = 0.01      // 0.00001
 var MIN_VOLUME24H float64 = 1.00   // 0.00001
@@ -36,8 +31,6 @@ var ban_pairs = map[string]bool{}  // ignored tradepairs
 var nodenames = NodeNames{}
 var namenodes = NameNodes{}
 var graph = loophole.Graph{}
-var cur_fee float64
-var cur_fee_k float64
 
 var xcg exchange.Exchange
 
@@ -122,7 +115,7 @@ func generate() {
 	mp := xcg.GetMarketplace()
 	tps := mp.Pairs
 	tpnames_unfiltered := make([]string, 0, len(tps))
-	for tpname, _ := range tps {
+	for tpname := range tps {
 		tpnames_unfiltered = append(tpnames_unfiltered, tpname)
 	}
 	sort.Strings(tpnames_unfiltered)
@@ -218,13 +211,13 @@ func decode(mp MyPath) {
 		var result float64
 		price = find_weight(T.Token, T.Currency)
 		if T.Currency == to { // продаём from, получаем to
-			result = amount * price * cur_fee_k
+			result = amount * price * (1.0 - T.SellFee)
 			action = fmt.Sprintf(" [%s->%s] sell %s, amount=%.8f[%s] * price=%.8f - %.2f%% = %.8f %s",
-				from, to, from, amount, from, price, cur_fee, result, to)
+				from, to, from, amount, from, price, T.SellFee * 100.0, result, to)
 		} else { // покупаем to за from
-			result = amount / price * cur_fee_k
+			result = amount / price * (1.0 - T.BuyFee)
 			action = fmt.Sprintf(" [%s<-%s] buy %s, amount=%.8f[%s] / price=%.8f - %.2f%% = %.8f %s",
-				to, from, to, amount, from, price, cur_fee, result, to)
+				to, from, to, amount, from, price, T.BuyFee * 100.0, result, to)
 		}
 		Out("  %s", action)
 		from = to
@@ -372,8 +365,6 @@ func main() {
 	case "LIVECOIN":
 		livecoin.Register()
 		xcg = exchange.Registry["LIVECOIN"]
-		cur_fee = BITTREX_FEE
-		cur_fee_k = BITTREX_FEE_K
 	default:
 		Err("! UNKNOWN EXCHANGE: %v", xcgName)
 	}
