@@ -1,12 +1,12 @@
-package main
+package client
 
 import (
 	"github.com/boltdb/bolt"
-	"time"
 	"log"
+	"time"
 )
 
-const 	DATABASE_FNAME = "yobiway.bolt"
+const DATABASE_FNAME = "yobiway.bolt"
 
 var bucketCACHE = []byte("CACHE")
 
@@ -66,4 +66,3 @@ func cache_put(url, body []byte) {
 		return err
 	})
 }
-

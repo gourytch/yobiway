@@ -1,4 +1,4 @@
-package main
+package exchange
 
 import "testing"
 
@@ -55,14 +55,14 @@ func TestMarketplace_GetPrice(t *testing.T) {
 	var price float64
 	var err error
 
-	price,err = mp.GetPrice("FOO", "BAR")
+	price, err = mp.GetPrice("FOO", "BAR")
 	if err != nil {
 		t.Error("GetPrice(FOO,BAR) must return no error")
 	}
 	if price != 123.456 {
 		t.Error("GetPrice(FOO,BAR) must return 123.456")
 	}
-	price,err = mp.GetPrice("BAR", "FOO")
+	price, err = mp.GetPrice("BAR", "FOO")
 	if err == nil {
 		t.Error("GetPrice(BAR,FOO) must return error")
 	}
@@ -76,15 +76,15 @@ func TestMarketplace_GetPrice(t *testing.T) {
 		t.Error("GetPrice(BAR,FOO) must return 654.321")
 	}
 
-	price,err = mp.GetPrice("KAKA", "BYAKA")
+	price, err = mp.GetPrice("KAKA", "BYAKA")
 	if err == nil {
 		t.Error("GetPrice(KAKA,BYAKA) must return error")
 	}
-	price,err = mp.GetPrice("FOO", "BYAKA")
+	price, err = mp.GetPrice("FOO", "BYAKA")
 	if err == nil {
 		t.Error("GetPrice(FOO,BYAKA) must return error")
 	}
-	price,err = mp.GetPrice("KAKA", "BAR")
+	price, err = mp.GetPrice("KAKA", "BAR")
 	if err == nil {
 		t.Error("GetPrice(FOO,BYAKA) must return error")
 	}
@@ -92,11 +92,13 @@ func TestMarketplace_GetPrice(t *testing.T) {
 
 func TestMarketplace_Add(t *testing.T) {
 	mp := NewMarketplace()
-	tp := new(TradePair)
-	tp.Token = "TOKN"
-	tp.Currency = "CURN"
-	tp.Name = "TOKN/CURN"
-	tp.Vwap = 10.00
+	tp := &TradePair{
+		Token:    "TOKN",
+		Currency: "CURN",
+		Name:     "TOKN/CURN",
+		Volume:   1000.0,
+		Vwap:     10.00,
+	}
 	mp.Add(tp)
 	var ok bool
 	var price float64
@@ -111,10 +113,10 @@ func TestMarketplace_Add(t *testing.T) {
 		t.Error("Pairs[TOKN/CURN] is nil")
 	}
 	if tp2.Token != "TOKN" {
-		t.Error("Pairs[TOKN/CURN].Token != TOKN")
+		t.Errorf("Pairs[TOKN/CURN].Token = %v, != TOKN", tp2.Token)
 	}
 	if tp2.Currency != "CURN" {
-		t.Error("Pairs[TOKN/CURN].Currency != CURN")
+		t.Error("Pairs[TOKN/CURN].Currency = %v, != CURN", tp2.Currency)
 	}
 	_, ok = mp.Currencies["CURN"]
 	if !ok {
@@ -133,7 +135,7 @@ func TestMarketplace_Add(t *testing.T) {
 		t.Error("Pricemap[TOKN][CURN] not found")
 	}
 	if price != 10.00 {
-		t.Error("Pricemap[TOKN][CURN] != 10.00")
+		t.Error("Pricemap[TOKN][CURN] = %v, != 10.00", price)
 	}
 
 	CURN_Map, ok = mp.Pricemap["CURN"]

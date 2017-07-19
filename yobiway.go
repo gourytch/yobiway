@@ -357,12 +357,6 @@ func load_livecoin() {
 	}
 	mp := livecoin.GetAllTokens()
 
-	all_tickers, err = session.GetLivecoinTickers()
-	if err != nil {
-		log.Printf("ERROR: %s", err)
-	} else {
-		log.Printf("%d tickers\n", len(all_tickers))
-	}
 }
 
 func play_yobit(token string) {

@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"compress/gzip"
@@ -9,13 +9,13 @@ import (
 )
 
 const (
-	REQ_INTERVAL   = 1 * time.Second
+	REQ_INTERVAL = 1 * time.Second
 )
+
 type Session struct {
 	Client *http.Client
 	LastRq time.Time
 }
-
 
 func NewSession() *Session {
 	s := &Session{}

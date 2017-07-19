@@ -1,8 +1,7 @@
-package main
+package exchange
 
 import (
 	"fmt"
-	"github.com/go-gl/gl/v2.1/gl"
 )
 
 type TokenInfo struct {
@@ -11,23 +10,23 @@ type TokenInfo struct {
 }
 
 type TradePair struct {
-	Name       string  // пара в формате "ТОКЕН/ВАЛЮТА" капсом (req)
-	URL        string  // адрес торговой пары на бирже (если есть)
-	Token      string  // символ токена (req)
-	Currency   string  // за какую валюту торгуется? (req)
-	Vwap       float64 // Volume Weighted Average Price (Средневзвешенная цена)
-	Volume     float64 // текущий объём торгов в токенах
-	Volume24H  float64 // объём торгов в токенах за последние сутки
-	Max_Bid    float64 // максимальная цена приказа покупки
-	Min_Ask    float64 // минимальная цена приказа продажи
-	Num_Bid    int64   // количество обозреваемых приказов покупки в стакане
-	Num_Ask    int64   // количество обозреваемых приказов продажи в стакане
-	Sum_Bid    float64 // суммарное количество токенов в обозреваемых приказах покупки в стакане
-	Sum_Ask    float64 // суммарное количество токенов в обозреваемых приказах продажи в стакане
-	Num_Trades int64   // число совершенных сделок за последний час
-	BuyFee     float64 // комиссиионный процент на покупку
-	SellFee    float64 // комиссиионный процент на продажу
-	Min_Amount float64 // минимальное количество токенов в приказе
+	Name        string  // пара в формате "ТОКЕН/ВАЛЮТА" капсом (req)
+	URL         string  // адрес торговой пары на бирже (если есть)
+	Token       string  // символ токена (req)
+	Currency    string  // за какую валюту торгуется? (req)
+	Vwap        float64 // Volume Weighted Average Price (Средневзвешенная цена)
+	Volume      float64 // текущий объём торгов в токенах
+	Volume24H   float64 // объём торгов в токенах за последние сутки
+	Max_Bid     float64 // максимальная цена приказа покупки
+	Min_Ask     float64 // минимальная цена приказа продажи
+	Volume_Bids float64 // суммарное количество токенов в обозреваемых приказах покупки в стакане
+	Volume_Asks float64 // суммарное количество токенов в обозреваемых приказах продажи в стакане
+	Price_Bids  float64 // суммарная стоимость обозреваемых приказов покупки в стакане
+	Price_Asks  float64 // суммарная стоимость обозреваемых приказов продажи в стакане
+	Num_Trades  int64   // число совершенных сделок за последний час
+	BuyFee      float64 // комиссиионный процент на покупку
+	SellFee     float64 // комиссиионный процент на продажу
+	Min_Amount  float64 // минимальное количество токенов в приказе
 }
 
 type Marketplace struct {
@@ -90,13 +89,16 @@ func (mp *Marketplace) GetPrice(from, to string) (price float64, err error) {
 }
 
 func (mp *Marketplace) Add(tp *TradePair) {
-	if tp.Volume <= 0 || tp.Vwap <= 0 {
-		return // bad tradepair
-	}
 	mp.Pairs[tp.Name] = tp
 	mp.Currencies[tp.Currency] = true
 	mp.SetPrice(tp.Token, tp.Currency, tp.Vwap)
-	mp.SetPrice(tp.Currency, tp.Token, 1.0/tp.Vwap)
+	var reverse_price float64
+	if 0.0 < tp.Vwap {
+		reverse_price = 1.0 / tp.Vwap
+	} else {
+		reverse_price = 0.0
+	}
+	mp.SetPrice(tp.Currency, tp.Token, reverse_price)
 }
 
 func (mp *Marketplace) FilterByToken(token string) []*TradePair {
