@@ -228,7 +228,7 @@ func (p *BestPaths) add(myp MyPath) {
 
 func (p *BestPaths) show() {
 	for _, v := range *p {
-		fmt.Printf(" [%.4f] %v\n", v.weight, v.path)
+		fmt.Printf(" [%.8f] %v\n", v.weight, v.path)
 	}
 }
 
@@ -358,7 +358,7 @@ func main() {
 	}
 	fmt.Println("; generate graph")
 	generate()
-	fmt.Printf("; graph generated; size=%d\n", len(graph))
+	fmt.Printf("; graph with %d edges generated\n", len(graph))
 	if from == to {
 		fmt.Printf("; search for the best cycles with %s\n", from)
 		Loop(from)
