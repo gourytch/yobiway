@@ -10,6 +10,8 @@ import (
 
 	"github.com/gourytch/loophole"
 	"flag"
+	"github.com/gourytch/yobiway/client"
+	"github.com/gourytch/yobiway/exchange/livecoin"
 )
 
 
@@ -26,7 +28,7 @@ var BEST_LIMIT int = 3
 type NodeNames map[loophole.Node]string
 type NameNodes map[string]loophole.Node
 
-var session *Session
+var session *client.Session
 
 var nodenames NodeNames = NodeNames{}
 var namenodes NameNodes = NameNodes{}
@@ -418,12 +420,12 @@ func main() {
 	token = strings.ToUpper(token)
 	log.Printf("exchange=%v, token=%v, cached=%v", exchange, token, CACHED)
 
-	var err error = boltdb_init()
+	var err error = client.BoltDB_init()
 	if err != nil {
 		log.Fatalf("database not initialized: %s", err)
 	}
-	defer boltdb_close()
-	session = NewSession()
+	defer client.BoltDB_close()
+	session = client.NewSession()
 	switch exchange {
 	case "YOBIT":
 		play_yobit(token)

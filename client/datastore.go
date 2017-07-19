@@ -12,7 +12,7 @@ var bucketCACHE = []byte("CACHE")
 
 var boltdb *bolt.DB = nil
 
-func boltdb_init() error {
+func BoltDB_init() error {
 	var err error
 	boltdb, err = bolt.Open(DATABASE_FNAME, 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
@@ -36,7 +36,7 @@ func boltdb_init() error {
 	return err
 }
 
-func boltdb_close() {
+func BoltDB_close() {
 	boltdb.Close()
 }
 

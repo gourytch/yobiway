@@ -14,8 +14,8 @@ import (
 		timestamp: 1500444199219,
 		asks: [
 				[
-					"0.00000750",
-					"74.39991576"
+					"0.00000750", // price
+					"74.39991576" // quantity
 				],
 				...
 			],
@@ -70,7 +70,7 @@ func (x *LivecoinExchange) load_jorderbooks() error {
 func parse_order(J JOrder) Order {
 	var R Order
 	R.Price, _ = strconv.ParseFloat(J[0], 64)
-	R.Amount, _ = strconv.ParseFloat(J[0], 64)
+	R.Amount, _ = strconv.ParseFloat(J[1], 64)
 	return R
 }
 

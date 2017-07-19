@@ -22,7 +22,7 @@ type LivecoinExchange struct {
 	currencies    []string
 	tokens        []string
 	s             *client.Session
-	jtickers      []JLivecoinTickers
+	jtickers      JLivecoinTickers
 	jrestrictions JLivecoinRestrictions
 	jorderbooks   JLivecoinOrderbooks
 }
@@ -37,7 +37,7 @@ func (x *LivecoinExchange) Refresh() error {
 		return err
 	}
 	x.refresh_tokens()
-	if err = x.load_jrestrictions(); err != nil {
+	if err = x.load_restrictions(); err != nil {
 		return err
 	}
 	x.apply_restrictions()

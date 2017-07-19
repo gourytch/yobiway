@@ -69,14 +69,8 @@ func (x *LivecoinExchange) refresh_tokens() error {
 			Volume24H:   J.Volume,
 			Max_Bid:     J.MaxBid,
 			Min_Ask:     J.MinAsk,
-			Volume_Bids: -1,
-			Volume_Asks: -1,
-			Price_Bids:  -1,
-			Price_Asks:  -1,
-			Num_Trades:  -1,
 			BuyFee:      0.002,
 			SellFee:     0.002,
-			Min_Amount:  -1,
 		}
 		x.marketplace.Add(tp)
 	}

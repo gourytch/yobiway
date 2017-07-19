@@ -32,7 +32,7 @@ type JLivecoinRestrictions struct {
 	Restrictions []JLivecoinRestriction `json:"restrictions"`
 }
 
-func (x *LivecoinExchange) load_jrestrictions() error {
+func (x *LivecoinExchange) load_restrictions() error {
 	var data []byte
 	var err error
 
