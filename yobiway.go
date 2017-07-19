@@ -21,7 +21,8 @@ var BITTREX_FEE_K float64 = (1.0 - BITTREX_FEE/100.0)
 
 var MAX_DISPERSION float64 = 0.2
 var MIN_PRICE float64 = 0.00000100 // 0.0000001
-var MIN_VOLUME float64 = 100       // 0.00001
+var MIN_VOLUME float64 = 0.01       // 0.00001
+var MIN_VOLUME24H float64 = 1.00       // 0.00001
 var BEST_LIMIT int = 3
 
 type NodeNames map[loophole.Node]string
@@ -96,7 +97,7 @@ func generate() {
 				log.Printf("skip ticker %s by total volume %.6f", pair.Name, pair.Volume)
 				continue
 			}
-			if pair.Volume24H < MIN_VOLUME {
+			if pair.Volume24H < MIN_VOLUME24H {
 				log.Printf("skip ticker %s by daily volume %.6f", pair.Name, pair.Volume24H)
 				continue
 			}
