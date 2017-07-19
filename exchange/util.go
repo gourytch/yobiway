@@ -19,6 +19,7 @@ func (t *TradePair) Info() string {
 		fmt.Sprintf("   Volume24H   : %f\n", t.Volume24H) +
 		fmt.Sprintf("   Max_Bid     : %.8f\n", t.Max_Bid) +
 		fmt.Sprintf("   Min_Ask     : %.8f\n", t.Min_Ask) +
+		fmt.Sprintf("   Avg_Price   : %.8f\n", t.Avg_Price) +
 		fmt.Sprintf("   Volume_Bids : %f\n", t.Volume_Bids) +
 		fmt.Sprintf("   Volume_Asks : %f\n", t.Volume_Asks) +
 		fmt.Sprintf("   Price_Bids  : %f\n", t.Price_Bids) +

@@ -49,7 +49,7 @@ func (x *LivecoinExchange) load_restrictions() error {
 func (x *LivecoinExchange) apply_restrictions() {
 	var R JLivecoinRestriction
 	for _, R = range x.jrestrictions.Restrictions {
-		var P *exchange.TradePair = x.GetTradePair(R.CurrencyPair)
+		var P *exchange.TradePair = x.pairs[R.CurrencyPair]
 		if P == nil {
 			continue // missing pair
 		}

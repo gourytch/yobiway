@@ -12,7 +12,7 @@ const (
 	REQ_INTERVAL = 1 * time.Second
 )
 
-var CACHED_MODE = false
+var CACHED_MODE = true
 
 type Session struct {
 	Client *http.Client

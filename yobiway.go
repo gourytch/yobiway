@@ -24,6 +24,8 @@ var MIN_VOLUME24H float64 = 1.00   // 0.00001
 var MIN_VOLUME_ASK float64 = 0.01  // 0.00001
 var MIN_VOLUME_BID float64 = 0.01  // 0.00001
 var MAX_WINNERS int = 3
+var MAX_STEPS int = 10
+var QUIET bool = false
 
 type NodeNames map[loophole.Node]string
 type NameNodes map[string]loophole.Node
@@ -39,53 +41,73 @@ var cur_fee_k float64
 
 var xcg exchange.Exchange
 
+func Out(format string, args ...interface{}) {
+	if QUIET && strings.HasPrefix(format, "; "){
+		return
+	}
+	s := fmt.Sprintf(format, args...)
+	fmt.Println(s)
+}
+
+func Dbg(format string, args ...interface{}) {
+	if QUIET {
+		return
+	}
+	Out(format, args...)
+}
+
+func Err(format string, args ...interface{}) {
+	Out(format, args...)
+	os.Exit(1)
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 func check_pair(pair *exchange.TradePair) bool {
 	if ban_tokens[pair.Token] {
-		fmt.Printf("; hide trade pair %s by token %s\n", pair.Name, pair.Token)
+		Dbg("; hide trade pair %s by token %s", pair.Name, pair.Token)
 		return false
 	}
 	if ban_tokens[pair.Currency] {
-		fmt.Printf("; hide trade pair %s by currency token %s\n", pair.Name, pair.Currency)
+		Dbg("; hide trade pair %s by currency token %s", pair.Name, pair.Currency)
 		return false
 	}
 	// check for prices
 	if pair.Vwap < MIN_PRICE {
-		fmt.Printf("; hide trade pair %s by price %.8f\n", pair.Name, pair.Vwap)
+		Dbg("; hide trade pair %s by price %.8f", pair.Name, pair.Vwap)
 		return false
 	}
 	if pair.Volume < MIN_VOLUME {
-		fmt.Printf("; hide trade pair %s by total volume %f\n", pair.Name, pair.Volume)
+		Dbg("; hide trade pair %s by total volume %f", pair.Name, pair.Volume)
 		return false
 	}
 	if pair.Volume24H < MIN_VOLUME24H {
-		fmt.Printf("; hide trade pair %s by daily volume %f\n", pair.Name, pair.Volume24H)
+		Dbg("; hide trade pair %s by daily volume %f", pair.Name, pair.Volume24H)
 		return false
 	}
 	if pair.Volume_Asks < MIN_VOLUME_ASK {
-		fmt.Printf("; hide trade pair %s by asks volume %f\n", pair.Name, pair.Volume_Asks)
+		Dbg("; hide trade pair %s by asks volume %f", pair.Name, pair.Volume_Asks)
 		return false
 	}
 	if pair.Volume_Bids < MIN_VOLUME_BID {
-		fmt.Printf("; hide trade pair %s by bids volume %f\n", pair.Name, pair.Volume_Bids)
+		Dbg("; hide trade pair %s by bids volume %f", pair.Name, pair.Volume_Bids)
 		return false
 	}
 	return true
 }
 
 func check_pairs(tpnames []string) {
-	fmt.Printf("; filter for %d trade pairs\n", len(tpnames))
+	Dbg("; filter for %d trade pairs", len(tpnames))
 	tps := xcg.GetMarketplace().Pairs
 	for _, tpname := range tpnames {
 		if !check_pair(tps[tpname]) {
 			ban_pairs[tpname] = true
 		}
 	}
-	fmt.Printf("; %d trade pairs banned\n", len(ban_pairs))
+	Dbg("; %d trade pairs banned", len(ban_pairs))
 }
 
 func generate() {
-	fmt.Println("; prepare node maps")
+	Dbg("; prepare node maps")
 	graph = loophole.Graph{}
 	nodenames = NodeNames{}
 	namenodes = NameNodes{}
@@ -95,7 +117,7 @@ func generate() {
 		id := loophole.Node(ix)
 		namenodes[token] = id
 		nodenames[id] = token
-		fmt.Printf("; %03v %s\n", id, token)
+		Dbg("; %03v %s", id, token)
 	}
 	mp := xcg.GetMarketplace()
 	tps := mp.Pairs
@@ -105,21 +127,21 @@ func generate() {
 	}
 	sort.Strings(tpnames_unfiltered)
 	check_pairs(tpnames_unfiltered)
-	tpnames := make([]string, 0, len(tpnames_unfiltered) - len(ban_pairs))
+	tpnames := make([]string, 0, len(tpnames_unfiltered)-len(ban_pairs))
 	for _, tpname := range tpnames_unfiltered {
 		if ban_pairs[tpname] {
 			continue
 		}
 		tpnames = append(tpnames, tpname)
 	}
-	fmt.Printf("; generate graph from %d filtered trade pairs\n", len(tpnames))
+	Dbg("; generate graph from %d filtered trade pairs", len(tpnames))
 	for _, tpname := range tpnames {
 		tp := tps[tpname]
 		node_token := namenodes[tp.Token]
 		node_currency := namenodes[tp.Currency]
 		price_forward := mp.Pricemap[tp.Token][tp.Currency]
 		price_backward := mp.Pricemap[tp.Currency][tp.Token]
-		fmt.Printf("; add edges %d:%s<->%d:%s [%f/%f]\n",
+		Dbg("; add edges %d:%s<->%d:%s [%f/%f]",
 			node_token, tp.Token, node_currency, tp.Currency,
 			price_forward, price_backward)
 		graph = append(graph, loophole.Edge{
@@ -155,7 +177,7 @@ func find_indirect(from, to string) (tp *exchange.TradePair) {
 	if tp != nil {
 		return
 	}
-	fmt.Printf("! ticker %s,%s lost\n", from, to)
+	Out("! ticker %s,%s lost", from, to)
 	return
 }
 
@@ -176,12 +198,11 @@ func makeMyPath(path *loophole.Path) (r MyPath) {
 }
 
 func tickers(mp MyPath) {
-	fmt.Println("= LIST OF USED TRADE PAIRS")
+	Out("= LIST OF USED TRADE PAIRS")
 	from := mp.path[0]
 	for _, to := range mp.path[1:] {
 		T := find_indirect(from, to)
-		fmt.Printf(" from %s to %s:\n", from, to)
-		fmt.Printf("%s\n", T.Info())
+		Out("%s", T.Info())
 		from = to
 	}
 }
@@ -189,7 +210,7 @@ func tickers(mp MyPath) {
 func decode(mp MyPath) {
 	from := mp.path[0]
 	amount := 1.00
-	fmt.Printf("= TRADE STRATEGY, AT START %.8f %s\n", amount, from)
+	Out("= TRADE STRATEGY, AT START %.8f %s", amount, from)
 	for _, to := range mp.path[1:] {
 		T := find_indirect(from, to)
 		var action string
@@ -205,11 +226,11 @@ func decode(mp MyPath) {
 			action = fmt.Sprintf(" [%s<-%s] buy %s, amount=%.8f[%s] / price=%.8f - %.2f%% = %.8f %s",
 				to, from, to, amount, from, price, cur_fee, result, to)
 		}
-		fmt.Printf("  %s\n", action)
+		Out("  %s", action)
 		from = to
 		amount = result
 	}
-	fmt.Printf("= AT END %.8f %s\n", amount, from)
+	Out("= AT END %.8f %s\n", amount, from)
 }
 
 type BestPaths []MyPath
@@ -228,7 +249,7 @@ func (p *BestPaths) add(myp MyPath) {
 
 func (p *BestPaths) show() {
 	for _, v := range *p {
-		fmt.Printf(" [%.8f] %v\n", v.weight, v.path)
+		Out(" [%.8f] %v", v.weight, v.path)
 	}
 }
 
@@ -251,7 +272,7 @@ func (m *PathsMap) show() {
 	}
 	sort.Ints(ixs)
 	for _, ix := range ixs {
-		fmt.Printf("= PATHS WITH LENGTH %d\n", ix)
+		Out("= PATHS WITH LENGTH %d", ix)
 		r := (*m)[ix]
 		r.show()
 		tickers((*r)[0])
@@ -265,6 +286,9 @@ var botb BestPaths
 
 func path_processor(path *loophole.Path) bool {
 	mypath := makeMyPath(path)
+	if MAX_STEPS < len(mypath.path) {
+		return false
+	}
 	// l := len(*path)
 	// fmt.Printf("path:%v, Len:%v, best:%#v\n", mypath, l, best)
 	(&best).add(mypath)
@@ -273,22 +297,23 @@ func path_processor(path *loophole.Path) bool {
 }
 
 func Loop(token string) {
-	fmt.Printf("= LOOP FOR %s\n", token)
+	Out("= LOOP FOR %s", token)
 	node := namenodes[token]
 	best = make(PathsMap)
 	(&graph).Walk(node, node, path_processor)
 	(&best).show()
-	fmt.Printf("= MOST PROFITABLE PATHS\n")
+	Out("= MOST PROFITABLE PATHS")
 	(&botb).show()
 }
 
 func Way(from, to string) {
-	fmt.Printf(" === WAY FROM %s TO %s ===\n", from, to)
+	Out(" === WAY FROM %s TO %s ===", from, to)
 	node_from := namenodes[from]
 	node_to := namenodes[to]
 	best = make(PathsMap)
 	(&graph).Walk(node_from, node_to, path_processor)
 	(&best).show()
+	Out("= MOST PROFITABLE PATHS")
 	(&botb).show()
 }
 
@@ -301,8 +326,10 @@ func main() {
 	flag.StringVar(&from, "from", "BTC", "token to start")
 	flag.StringVar(&to, "to", "BTC", "token to finish")
 	flag.StringVar(&exclude, "exclude", "", "tokens to exclude")
-	flag.BoolVar(&client.CACHED_MODE, "cached", true, "use cached requests")
+	flag.BoolVar(&client.CACHED_MODE, "cached", client.CACHED_MODE, "use cached requests")
+	flag.BoolVar(&QUIET, "quiet", QUIET, "be quiet")
 	flag.IntVar(&MAX_WINNERS, "max_winners", MAX_WINNERS, "limit number of winners in each category")
+	flag.IntVar(&MAX_STEPS, "max_steps", MAX_STEPS, "limit steps in way")
 	flag.Float64Var(&MIN_PRICE, "min_price", MIN_PRICE, "filter by minimal price")
 	flag.Float64Var(&MIN_VOLUME, "min_volume", MIN_VOLUME, "filter by minimal current volume")
 	flag.Float64Var(&MIN_VOLUME24H, "min_volume24h", MIN_VOLUME24H, "filter by minimal daily volume")
@@ -313,17 +340,18 @@ func main() {
 	from = strings.ToUpper(from)
 	to = strings.ToUpper(to)
 	exclude = strings.ToUpper(exclude)
-	fmt.Printf("= INITIAL PARAMETERS\n")
-	fmt.Printf(" exchange       = %v\n", xcgName)
-	fmt.Printf(" search way for = %v->%v\n", from, to)
-	fmt.Printf(" exclude tokens = %v\n", exclude)
-	fmt.Printf(" use cached req = %v\n", client.CACHED_MODE)
-	fmt.Printf(" MAX_WINNERS    = %d\n", MAX_WINNERS)
-	fmt.Printf(" MIN_PRICE      = %.8f\n", MIN_PRICE)
-	fmt.Printf(" MIN_VOLUME     = %f\n", MIN_VOLUME)
-	fmt.Printf(" MIN_VOLUME24H  = %f\n", MIN_VOLUME24H)
-	fmt.Printf(" MIN_VOLUME_BID = %f\n", MIN_VOLUME_BID)
-	fmt.Printf(" MIN_VOLUME_ASK = %f\n", MIN_VOLUME_ASK)
+	Out("= INITIAL PARAMETERS")
+	Out(" exchange       = %v", xcgName)
+	Out(" search way for = %v->%v", from, to)
+	Out(" exclude tokens = %v", exclude)
+	Out(" use cached req = %v", client.CACHED_MODE)
+	Out(" MAX_WINNERS    = %d", MAX_WINNERS)
+	Out(" MAX_STEPS      = %d", MAX_STEPS)
+	Out(" MIN_PRICE      = %.8f", MIN_PRICE)
+	Out(" MIN_VOLUME     = %f", MIN_VOLUME)
+	Out(" MIN_VOLUME24H  = %f", MIN_VOLUME24H)
+	Out(" MIN_VOLUME_BID = %f", MIN_VOLUME_BID)
+	Out(" MIN_VOLUME_ASK = %f", MIN_VOLUME_ASK)
 
 	for _, s := range strings.Split(exclude, ",") {
 		ban_tokens[s] = true
@@ -331,8 +359,7 @@ func main() {
 
 	var err error = client.BoltDB_init()
 	if err != nil {
-		fmt.Printf("! database not initialized: %s", err)
-		os.Exit(1)
+		Err("! database not initialized: %s", err)
 	}
 	defer client.BoltDB_close()
 	switch xcgName {
@@ -348,23 +375,21 @@ func main() {
 		cur_fee = BITTREX_FEE
 		cur_fee_k = BITTREX_FEE_K
 	default:
-		fmt.Printf("! UNKNOWN EXCHANGE: %v\n", xcgName)
-		os.Exit(1)
+		Err("! UNKNOWN EXCHANGE: %v", xcgName)
 	}
-	fmt.Println("; load data")
+	Dbg("; load data")
 	if err = xcg.Refresh(); err != nil {
-		fmt.Printf("! DATA LOAD ERROR: %v\n", err)
-		os.Exit(1)
+		Err("! DATA LOAD ERROR: %v", err)
 	}
-	fmt.Println("; generate graph")
+	Dbg("; generate graph")
 	generate()
-	fmt.Printf("; graph with %d edges generated\n", len(graph))
+	Dbg("; graph with %d edges generated", len(graph))
 	if from == to {
-		fmt.Printf("; search for the best cycles with %s\n", from)
+		Dbg("; search for the best cycles with %s", from)
 		Loop(from)
 	} else {
-		fmt.Printf("; search for the best ways %s->%s\n", from, to)
+		Dbg("; search for the best ways %s->%s", from, to)
 		Way(from, to)
 	}
-	fmt.Println("; done.")
+	Dbg("; done.")
 }

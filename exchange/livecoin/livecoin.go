@@ -25,6 +25,7 @@ type LivecoinExchange struct {
 	jtickers      JLivecoinTickers
 	jrestrictions JLivecoinRestrictions
 	jorderbooks   JLivecoinOrderbooks
+	pairs         map[string]*exchange.TradePair
 }
 
 func (x *LivecoinExchange) GetName() string {
@@ -33,10 +34,10 @@ func (x *LivecoinExchange) GetName() string {
 
 func (x *LivecoinExchange) Refresh() error {
 	var err error
-	if err = x.load_jtickers(); err != nil {
+	if err = x.load_tickers(); err != nil {
 		return err
 	}
-	x.refresh_tokens()
+	x.parse_tradepairs()
 	if err = x.load_restrictions(); err != nil {
 		return err
 	}
@@ -45,6 +46,7 @@ func (x *LivecoinExchange) Refresh() error {
 		return err
 	}
 	x.apply_orderbooks()
+	x.generate_marketplace()
 	return nil
 }
 

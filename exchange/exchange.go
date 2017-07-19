@@ -1,32 +1,42 @@
 package exchange
 
-import (
-	"fmt"
-)
-
 type TokenInfo struct {
 	Token string
 	Name  string
 }
 
+type Order struct {
+	Price  float64 // по какой цене за токен поставили
+	Amount float64 // сколько токенов поставили
+}
+
+type Orders []Order // список ордеров
+
+type Orderbook struct {
+	Asks Orders // выставленные на продажу
+	Bids Orders // выставленные на покупку
+}
+
 type TradePair struct {
-	Name        string  // пара в формате "ТОКЕН/ВАЛЮТА" капсом (req)
-	URL         string  // адрес торговой пары на бирже (если есть)
-	Token       string  // символ токена (req)
-	Currency    string  // за какую валюту торгуется? (req)
-	Vwap        float64 // Volume Weighted Average Price (Средневзвешенная цена)
-	Volume      float64 // текущий объём торгов в токенах
-	Volume24H   float64 // объём торгов в токенах за последние сутки
-	Max_Bid     float64 // максимальная цена приказа покупки
-	Min_Ask     float64 // минимальная цена приказа продажи
-	Volume_Bids float64 // суммарное количество токенов в обозреваемых приказах покупки в стакане
-	Volume_Asks float64 // суммарное количество токенов в обозреваемых приказах продажи в стакане
-	Price_Bids  float64 // суммарная стоимость обозреваемых приказов покупки в стакане
-	Price_Asks  float64 // суммарная стоимость обозреваемых приказов продажи в стакане
-	Num_Trades  int64   // число совершенных сделок за последний час
-	BuyFee      float64 // комиссиионный процент на покупку
-	SellFee     float64 // комиссиионный процент на продажу
-	Min_Amount  float64 // минимальное количество токенов в приказе
+	Name        string    // пара в формате "ТОКЕН/ВАЛЮТА" капсом (req)
+	URL         string    // адрес торговой пары на бирже (если есть)
+	Token       string    // символ токена (req)
+	Currency    string    // за какую валюту торгуется? (req)
+	Vwap        float64   // Volume Weighted Average Price (Средневзвешенная цена)
+	Volume      float64   // текущий объём торгов в токенах
+	Volume24H   float64   // объём торгов в токенах за последние сутки
+	Max_Bid     float64   // текущая максимальная цена приказа покупки
+	Min_Ask     float64   // текущая минимальная цена приказа продажи
+	Avg_Price   float64   // текущая средняя цена (Max_Bid + Min_Ask) / 2
+	Volume_Bids float64   // суммарное количество токенов в обозреваемых приказах покупки в стакане
+	Volume_Asks float64   // суммарное количество токенов в обозреваемых приказах продажи в стакане
+	Price_Bids  float64   // суммарная стоимость обозреваемых приказов покупки в стакане
+	Price_Asks  float64   // суммарная стоимость обозреваемых приказов продажи в стакане
+	Num_Trades  int64     // число совершенных сделок за последний час
+	BuyFee      float64   // комиссиионный процент на покупку
+	SellFee     float64   // комиссиионный процент на продажу
+	Min_Amount  float64   // минимальное количество токенов в приказе
+	Orderbook   Orderbook // стакан торгов
 }
 
 type Marketplace struct {
@@ -42,61 +52,4 @@ type Exchange interface {
 	GetAllCurrencies() []string          // получить список всех активных валют, пользующихся на бирже
 	GetMarketplace() *Marketplace        //  получить описание рынка
 	GetTradePair(name string) *TradePair // получить отдельную пару
-}
-
-func NewMarketplace() *Marketplace {
-	mp := new(Marketplace)
-	mp.Clear()
-	return mp
-}
-
-func (mp *Marketplace) Clear() {
-	mp.Currencies = make(map[string]bool)
-	mp.Pairs = make(map[string]*TradePair)
-	mp.Pricemap = make(map[string]map[string]float64)
-}
-
-func (mp *Marketplace) SetPrice(from, to string, price float64) {
-	if mp.Pricemap[from] == nil {
-		mp.Pricemap[from] = make(map[string]float64)
-	}
-	mp.Pricemap[from][to] = price
-}
-
-func (mp *Marketplace) GetPrice(from, to string) (price float64, err error) {
-	M, ok := mp.Pricemap[from]
-	if !ok {
-		err = fmt.Errorf("token %v not exists", from)
-		return
-	}
-	price, ok = M[to]
-	if !ok {
-		err = fmt.Errorf("no way for direction %v->%v", from, to)
-		return
-	}
-	return
-}
-
-func (mp *Marketplace) Add(tp *TradePair) {
-	mp.Pairs[tp.Name] = tp
-	mp.Currencies[tp.Currency] = true
-	mp.SetPrice(tp.Token, tp.Currency, tp.Vwap)
-	var reverse_price float64
-	if 0.0 < tp.Vwap {
-		reverse_price = 1.0 / tp.Vwap
-	} else {
-		reverse_price = 0.0
-	}
-	mp.SetPrice(tp.Currency, tp.Token, reverse_price)
-}
-
-func (mp *Marketplace) FilterByToken(token string) []*TradePair {
-	dsts := mp.Pricemap[token]
-	V := make([]*TradePair, len(dsts))
-	ix := 0
-	for dst := range dsts {
-		V[ix] = mp.Pairs[token+"/"+dst]
-		ix++
-	}
-	return V
 }

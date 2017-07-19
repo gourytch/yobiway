@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"github.com/gourytch/yobiway/client"
+	"github.com/gourytch/yobiway/exchange"
 )
 
 /*
@@ -43,17 +44,6 @@ type JOrderbook struct {
 
 type JLivecoinOrderbooks map[string]JOrderbook
 
-type Order struct {
-	Price  float64
-	Amount float64
-}
-
-type Orders []Order
-type Orderbook struct {
-	Asks Orders
-	Bids Orders
-}
-
 func (x *LivecoinExchange) load_orderbooks() error {
 	var data []byte
 	var err error
@@ -68,29 +58,29 @@ func (x *LivecoinExchange) load_orderbooks() error {
 	return nil
 }
 
-func parse_order(J JOrder) Order {
-	var R Order
+func parse_order(J JOrder) exchange.Order {
+	var R exchange.Order
 	R.Price, _ = strconv.ParseFloat(J[0], 64)
 	R.Amount, _ = strconv.ParseFloat(J[1], 64)
 	return R
 }
 
-func parse_orders(J JOrders) Orders {
-	V := make(Orders, len(J))
+func parse_orders(J JOrders) exchange.Orders {
+	V := make(exchange.Orders, len(J))
 	for ix, j := range J {
 		V[ix] = parse_order(j)
 	}
 	return V
 }
 
-func parse_orderbook(J JOrderbook) Orderbook {
-	var B Orderbook
+func parse_orderbook(J JOrderbook) exchange.Orderbook {
+	var B exchange.Orderbook
 	B.Asks = parse_orders(J.Asks)
 	B.Bids = parse_orders(J.Bids)
 	return B
 }
 
-func summarize_orders(V Orders) (value, price float64) {
+func summarize_orders(V exchange.Orders) (value, price float64) {
 	value = 0.0
 	price = 0.0
 	for _, order := range V {
@@ -104,12 +94,29 @@ func (x *LivecoinExchange) apply_orderbooks() {
 	var J JOrderbook
 	var name string
 	for name, J = range x.jorderbooks {
-		B := parse_orderbook(J)
-		P := x.GetTradePair(name)
+		P := x.pairs[name]
 		if P == nil {
 			continue
 		}
-		P.Volume_Asks, P.Price_Asks = summarize_orders(B.Asks)
-		P.Volume_Bids, P.Price_Bids = summarize_orders(B.Bids)
+		P.Orderbook = parse_orderbook(J)
+		P.Volume_Asks, P.Price_Asks = summarize_orders(P.Orderbook.Asks)
+		P.Volume_Bids, P.Price_Bids = summarize_orders(P.Orderbook.Bids)
+		if len(P.Orderbook.Asks) > 0 {
+			P.Min_Ask = P.Orderbook.Asks[0].Price
+			for _, r := range P.Orderbook.Asks {
+				if r.Price < P.Min_Ask {
+					P.Min_Ask = r.Price
+				}
+			}
+		}
+		if len(P.Orderbook.Bids) > 0 {
+			P.Max_Bid = P.Orderbook.Bids[0].Price
+			for _, r := range P.Orderbook.Bids {
+				if P.Max_Bid < r.Price {
+					P.Max_Bid = r.Price
+				}
+			}
+		}
+		P.Avg_Price = (P.Max_Bid + P.Min_Ask) / 2.0
 	}
 }

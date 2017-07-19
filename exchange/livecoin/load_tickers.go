@@ -44,7 +44,7 @@ type JLivecoinTicker struct {
 
 type JLivecoinTickers []JLivecoinTicker
 
-func (x *LivecoinExchange) load_jtickers() error {
+func (x *LivecoinExchange) load_tickers() error {
 	var data []byte
 	var err error
 
@@ -57,25 +57,34 @@ func (x *LivecoinExchange) load_jtickers() error {
 	return nil
 }
 
-func (x *LivecoinExchange) refresh_tokens() error {
+func (x *LivecoinExchange) parse_tradepairs() error {
 	var J JLivecoinTicker
+	x.pairs = map[string]*exchange.TradePair{}
 	for _, J = range x.jtickers {
 		V := strings.Split(J.Symbol, "/")
 		tp := &exchange.TradePair{
-			Name:        J.Symbol,
-			URL:         fmt.Sprintf("https://www.livecoin.net/en/trade/index?currencyPair=%s", J.Symbol),
-			Token:       J.Token,
-			Currency:    V[1],
-			Vwap:        J.VWap,
-			Volume:      J.Volume,
-			Volume24H:   J.Volume,
-			Max_Bid:     J.MaxBid,
-			Min_Ask:     J.MinAsk,
-			BuyFee:      0.002,
-			SellFee:     0.002,
+			Name:      J.Symbol,
+			URL:       fmt.Sprintf("https://www.livecoin.net/en/trade/index?currencyPair=%s", J.Symbol),
+			Token:     J.Token,
+			Currency:  V[1],
+			Vwap:      J.VWap,
+			Volume:    J.Volume,
+			Volume24H: J.Volume,
+			Max_Bid:   J.MaxBid,
+			Min_Ask:   J.MinAsk,
+			BuyFee:    0.002,
+			SellFee:   0.002,
 		}
+		x.pairs[tp.Name] = tp
+	}
+	return nil
+}
+
+func (x *LivecoinExchange) generate_marketplace() {
+	for _, tp := range x.pairs {
 		x.marketplace.Add(tp)
 	}
+
 	x.tokens = make([]string, len(x.marketplace.Pricemap))
 	ix := 0
 	for token := range x.marketplace.Pricemap {
@@ -88,5 +97,4 @@ func (x *LivecoinExchange) refresh_tokens() error {
 		x.currencies[ix] = token
 		ix++
 	}
-	return nil
 }
