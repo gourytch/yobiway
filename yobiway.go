@@ -351,6 +351,12 @@ func load_ccex() {
 
 func load_livecoin() {
 	var err error
+	if err = livecoin.Refresh(); err != nil {
+		log.Printf("ERROR: %s", err)
+		return
+	}
+	mp := livecoin.GetAllTokens()
+
 	all_tickers, err = session.GetLivecoinTickers()
 	if err != nil {
 		log.Printf("ERROR: %s", err)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/go-gl/gl/v2.1/gl"
 )
 
 type TokenInfo struct {
@@ -57,10 +58,14 @@ func RegisterExchange(xcg Exchange) error {
 
 func NewMarketplace() *Marketplace {
 	mp := new(Marketplace)
+	mp.Clear()
+	return mp
+}
+
+func (mp *Marketplace) Clear() {
 	mp.Currencies = make(map[string]bool)
 	mp.Pairs = make(map[string]*TradePair)
 	mp.Pricemap = make(map[string]map[string]float64)
-	return mp
 }
 
 func (mp *Marketplace) SetPrice(from, to string, price float64) {
@@ -85,6 +90,9 @@ func (mp *Marketplace) GetPrice(from, to string) (price float64, err error) {
 }
 
 func (mp *Marketplace) Add(tp *TradePair) {
+	if tp.Volume <= 0 || tp.Vwap <= 0 {
+		return // bad tradepair
+	}
 	mp.Pairs[tp.Name] = tp
 	mp.Currencies[tp.Currency] = true
 	mp.SetPrice(tp.Token, tp.Currency, tp.Vwap)
