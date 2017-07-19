@@ -11,7 +11,7 @@
 // market summaries: https://bittrex.com/api/v1.1/public/getmarketsummaries
 // market summary: https://bittrex.com/api/v1.1/public/getmarketsummary?market={BASE}-{TRADE}
 
-package main
+package bittrex
 
 import (
 	"encoding/json"

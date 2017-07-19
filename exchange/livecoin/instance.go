@@ -6,7 +6,7 @@ import (
 )
 
 func Register() {
-	exchange.RegisterExchange(&LivecoinExchange{
+	exchange.Register(&LivecoinExchange{
 		marketplace: exchange.NewMarketplace(),
 		currencies:  make([]string, 0),
 		tokens:      make([]string, 0),

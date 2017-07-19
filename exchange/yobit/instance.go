@@ -6,7 +6,7 @@ import (
 )
 
 func Register() {
-	exchange.RegisterExchange(&YobitExchange{
+	exchange.Register(&YobitExchange{
 		marketplace: exchange.NewMarketplace(),
 		currencies:  make([]string, 0),
 		tokens:      make([]string, 0),

@@ -7,14 +7,14 @@ import (
 
 func TestRegister(t *testing.T) {
 	Register()
-	x, ok := exchange.ExchangesRegistry["LIVECOIN"]
+	x, ok := exchange.Registry["LIVECOIN"]
 	if !ok {
-		t.Error("LIVECOIN not in ExchangesRegistry")
+		t.Error("LIVECOIN not in Registry")
 	}
 	if x == nil {
-		t.Error("ExchangesRegistry[LIVECOIN] is nil")
+		t.Error("Registry[LIVECOIN] is nil")
 	}
 	if s := x.GetName(); s != "LIVECOIN" {
-		t.Errorf("ExchangesRegistry[LIVECOIN].GetName() = %v, != LIVECOIN", s)
+		t.Errorf("Registry[LIVECOIN].GetName() = %v, != LIVECOIN", s)
 	}
 }

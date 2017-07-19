@@ -2,7 +2,7 @@
 // https://c-cex.com/t/prices.json
 // market prices: https://c-cex.com/t/api_pub.html?a=getmarketsummaries
 
-package main
+package ccex
 
 import (
 	"encoding/json"

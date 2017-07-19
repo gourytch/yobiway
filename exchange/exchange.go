@@ -44,17 +44,6 @@ type Exchange interface {
 	GetTradePair(name string) *TradePair // получить отдельную пару
 }
 
-var ExchangesRegistry map[string]Exchange = make(map[string]Exchange)
-
-func RegisterExchange(xcg Exchange) error {
-	name := xcg.GetName()
-	if _, ok := ExchangesRegistry[name]; ok {
-		return fmt.Errorf("exchange already registered: `%s`", name)
-	}
-	ExchangesRegistry[name] = xcg
-	return nil
-}
-
 func NewMarketplace() *Marketplace {
 	mp := new(Marketplace)
 	mp.Clear()
