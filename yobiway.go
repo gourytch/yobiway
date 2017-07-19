@@ -13,23 +13,23 @@ import (
 	"os"
 )
 
-
 var YOBI_FEE float64 = 0.2
 var YOBI_FEE_K float64 = (1.0 - YOBI_FEE/100.0)
 var BITTREX_FEE float64 = 0.25
 var BITTREX_FEE_K float64 = (1.0 - BITTREX_FEE/100.0)
 
 var MIN_PRICE float64 = 0.00000100 // 0.0000001
-var MIN_VOLUME float64 = 0.01       // 0.00001
-var MIN_VOLUME24H float64 = 1.00       // 0.00001
-var MIN_VOLUME_ASK float64 = 0.01       // 0.00001
-var MIN_VOLUME_BID float64 = 0.01       // 0.00001
+var MIN_VOLUME float64 = 0.01      // 0.00001
+var MIN_VOLUME24H float64 = 1.00   // 0.00001
+var MIN_VOLUME_ASK float64 = 0.01  // 0.00001
+var MIN_VOLUME_BID float64 = 0.01  // 0.00001
 var MAX_WINNERS int = 3
 
 type NodeNames map[loophole.Node]string
 type NameNodes map[string]loophole.Node
 
-var banlist = make(map[string]bool)
+var ban_tokens = map[string]bool{} // ignored tokens
+var ban_pairs = map[string]bool{}  // ignored tradepairs
 
 var nodenames = NodeNames{}
 var namenodes = NameNodes{}
@@ -40,86 +40,98 @@ var cur_fee_k float64
 var xcg exchange.Exchange
 
 ///////////////////////////////////////////////////////////////////////////////
+func check_pair(pair *exchange.TradePair) bool {
+	if ban_tokens[pair.Token] {
+		fmt.Printf("; hide trade pair %s by token %s\n", pair.Name, pair.Token)
+		return false
+	}
+	if ban_tokens[pair.Currency] {
+		fmt.Printf("; hide trade pair %s by currency token %s\n", pair.Name, pair.Currency)
+		return false
+	}
+	// check for prices
+	if pair.Vwap < MIN_PRICE {
+		fmt.Printf("; hide trade pair %s by price %.8f\n", pair.Name, pair.Vwap)
+		return false
+	}
+	if pair.Volume < MIN_VOLUME {
+		fmt.Printf("; hide trade pair %s by total volume %f\n", pair.Name, pair.Volume)
+		return false
+	}
+	if pair.Volume24H < MIN_VOLUME24H {
+		fmt.Printf("; hide trade pair %s by daily volume %f\n", pair.Name, pair.Volume24H)
+		return false
+	}
+	if pair.Volume_Asks < MIN_VOLUME_ASK {
+		fmt.Printf("; hide trade pair %s by asks volume %f\n", pair.Name, pair.Volume_Asks)
+		return false
+	}
+	if pair.Volume_Bids < MIN_VOLUME_BID {
+		fmt.Printf("; hide trade pair %s by bids volume %f\n", pair.Name, pair.Volume_Bids)
+		return false
+	}
+	return true
+}
+
+func check_pairs(tpnames []string) {
+	fmt.Printf("; filter for %d trade pairs\n", len(tpnames))
+	tps := xcg.GetMarketplace().Pairs
+	for _, tpname := range tpnames {
+		if !check_pair(tps[tpname]) {
+			ban_pairs[tpname] = true
+		}
+	}
+	fmt.Printf("; %d trade pairs banned\n", len(ban_pairs))
+}
 
 func generate() {
+	fmt.Println("; prepare node maps")
+	graph = loophole.Graph{}
 	nodenames = NodeNames{}
 	namenodes = NameNodes{}
-	var nextnode loophole.Node = 1
-	graph = loophole.Graph{}
+	all_tokens := xcg.GetAllTokens()
+	sort.Strings(all_tokens)
+	for ix, token := range all_tokens {
+		id := loophole.Node(ix)
+		namenodes[token] = id
+		nodenames[id] = token
+		fmt.Printf("; %03v %s\n", id, token)
+	}
 	mp := xcg.GetMarketplace()
-	fmt.Println("; generate graph from pricemap")
-	Vfrom := xcg.GetAllTokens()
-	sort.Strings(Vfrom)
-	for _, from := range Vfrom {
-		if banlist[from] {
+	tps := mp.Pairs
+	tpnames_unfiltered := make([]string, 0, len(tps))
+	for tpname, _ := range tps {
+		tpnames_unfiltered = append(tpnames_unfiltered, tpname)
+	}
+	sort.Strings(tpnames_unfiltered)
+	check_pairs(tpnames_unfiltered)
+	tpnames := make([]string, 0, len(tpnames_unfiltered) - len(ban_pairs))
+	for _, tpname := range tpnames_unfiltered {
+		if ban_pairs[tpname] {
 			continue
 		}
-		var ok bool
-		var node_from loophole.Node
-		var node_to loophole.Node
-
-		node_from, ok = namenodes[from]
-		if !ok {
-			node_from = nextnode
-			nextnode++
-			namenodes[from] = node_from
-			nodenames[node_from] = from
-		}
-		Mto := mp.Pricemap[from]
-		Vto := make([]string, len(Mto))
-		ix := 0
-		for k,_ := range Mto {
-			Vto[ix] = k
-			ix++
-		}
-		sort.Strings(Vto)
-		for _, to := range Vto {
-			if banlist[to] {
-				continue
-			}
-			price := Mto[to]
-			pair := xcg.GetTradePair(from + "/" + to)
-			if pair == nil {
-				pair = xcg.GetTradePair(to + "/" + from)
-			}
-			node_to, ok = namenodes[to]
-			if !ok {
-				node_to = nextnode
-				nextnode++
-				namenodes[to] = node_to
-				nodenames[node_to] = to
-			}
-		// check for prices
-			if price < MIN_PRICE {
-				fmt.Printf("; skip ticker %s by price %.8f\n", pair.Name, pair.Vwap)
-				continue
-			}
-			if pair.Volume < MIN_VOLUME {
-				fmt.Printf("; skip ticker %s by total volume %f\n", pair.Name, pair.Volume)
-				continue
-			}
-			if pair.Volume24H < MIN_VOLUME24H {
-				fmt.Printf("; skip ticker %s by daily volume %f\n", pair.Name, pair.Volume24H)
-				continue
-			}
-			if pair.Volume_Asks < MIN_VOLUME_ASK {
-				fmt.Printf("; skip ticker %s by asks volume %f\n", pair.Name, pair.Volume_Asks)
-				continue
-			}
-			if pair.Volume_Bids < MIN_VOLUME_BID {
-				fmt.Printf("; skip ticker %s by bids volume %f\n", pair.Name, pair.Volume_Bids)
-				continue
-			}
-			graph = append(graph, loophole.Edge{From:node_from, To: node_to, Weight: loophole.Weight(price)})
-		}
-		//fmt.Printf("add ticker %s to graph", pairname)
+		tpnames = append(tpnames, tpname)
 	}
-	tokens := []string{}
-	for token := range namenodes {
-		tokens = append(tokens, token)
+	fmt.Printf("; generate graph from %d filtered trade pairs\n", len(tpnames))
+	for _, tpname := range tpnames {
+		tp := tps[tpname]
+		node_token := namenodes[tp.Token]
+		node_currency := namenodes[tp.Currency]
+		price_forward := mp.Pricemap[tp.Token][tp.Currency]
+		price_backward := mp.Pricemap[tp.Currency][tp.Token]
+		fmt.Printf("; add edges %d:%s<->%d:%s [%f/%f]\n",
+			node_token, tp.Token, node_currency, tp.Currency,
+			price_forward, price_backward)
+		graph = append(graph, loophole.Edge{
+			From:   node_token,
+			To:     node_currency,
+			Weight: loophole.Weight(price_forward),
+		}, loophole.Edge{
+			From:   node_currency,
+			To:     node_token,
+			Weight: loophole.Weight(price_backward),
+		})
 	}
-	sort.Strings(tokens)
-	fmt.Printf("; graph tokens: %v\n", tokens)
 }
 
 func find_weight(from, to string) float64 {
@@ -240,7 +252,7 @@ func (m *PathsMap) show() {
 	sort.Ints(ixs)
 	for _, ix := range ixs {
 		fmt.Printf("= PATHS WITH LENGTH %d\n", ix)
-		r :=(*m)[ix]
+		r := (*m)[ix]
 		r.show()
 		tickers((*r)[0])
 		decode((*r)[0])
@@ -286,11 +298,11 @@ func main() {
 	var to string
 	var exclude string
 	flag.StringVar(&xcgName, "exchange", "livecoin", "exchange to analyze")
-	flag.StringVar(&from,"from", "BTC", "token to start")
-	flag.StringVar(&to,"to", "BTC", "token to finish")
-	flag.StringVar(&exclude,"exclude", "", "tokens to exclude")
-	flag.BoolVar(&client.CACHED_MODE,"cached", true, "use cached requests")
-	flag.IntVar(&MAX_WINNERS,"max_winners", MAX_WINNERS, "limit number of winners in each category")
+	flag.StringVar(&from, "from", "BTC", "token to start")
+	flag.StringVar(&to, "to", "BTC", "token to finish")
+	flag.StringVar(&exclude, "exclude", "", "tokens to exclude")
+	flag.BoolVar(&client.CACHED_MODE, "cached", true, "use cached requests")
+	flag.IntVar(&MAX_WINNERS, "max_winners", MAX_WINNERS, "limit number of winners in each category")
 	flag.Float64Var(&MIN_PRICE, "min_price", MIN_PRICE, "filter by minimal price")
 	flag.Float64Var(&MIN_VOLUME, "min_volume", MIN_VOLUME, "filter by minimal current volume")
 	flag.Float64Var(&MIN_VOLUME24H, "min_volume24h", MIN_VOLUME24H, "filter by minimal daily volume")
@@ -313,8 +325,8 @@ func main() {
 	fmt.Printf(" MIN_VOLUME_BID = %f\n", MIN_VOLUME_BID)
 	fmt.Printf(" MIN_VOLUME_ASK = %f\n", MIN_VOLUME_ASK)
 
-	for _, s := range strings.Split(exclude,",") {
-		banlist[s] = true
+	for _, s := range strings.Split(exclude, ",") {
+		ban_tokens[s] = true
 	}
 
 	var err error = client.BoltDB_init()
@@ -345,7 +357,7 @@ func main() {
 	}
 	fmt.Println("; generate graph")
 	generate()
-	fmt.Printf("; graph generated with %d edges\n", len(graph))
+	fmt.Printf("; graph generated; size=%d\n", len(graph))
 	if from == to {
 		fmt.Printf("; search for the best cycles with %s\n", from)
 		Loop(from)
